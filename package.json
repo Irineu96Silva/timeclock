@@ -1,0 +1,12 @@
+{
+  "name": "timeclock",
+  "private": true,
+  "packageManager": "pnpm@8.15.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @timeclock/api --filter @timeclock/web dev",
+    "dev:api": "pnpm --filter @timeclock/api dev",
+    "dev:web": "pnpm --filter @timeclock/web dev",
+    "prisma:migrate": "pnpm --filter @timeclock/api prisma:migrate",
+    "prisma:studio": "pnpm --filter @timeclock/api prisma:studio"
+  }
+}

@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  users       User[]
+  employees   EmployeeProfile[]
+  events      TimeClockEvent[]
+  adjustments TimeAdjustmentRequest[]
+  auditLogs   AuditLog[]
+  settings    CompanySettings?
+}
+
+model CompanySettings {
+  companyId            String  @id
+  geofenceEnabled      Boolean @default(true)
+  geoRequired          Boolean @default(true)
+  geofenceLat          Float
+  geofenceLng          Float
+  geofenceRadiusMeters Int     @default(200)
+  maxAccuracyMeters    Int     @default(100)
+  qrEnabled            Boolean @default(true)
+  punchFallbackMode    String  @default("GEO_OR_QR") // "GEO_ONLY" | "GEO_OR_QR" | "QR_ONLY"
+  qrSecret             String  @default("")
+  kioskDeviceLabel     String  @default("")
+
+  company Company @relation(fields: [companyId], references: [id])
+}
+
+model User {
+  id               String   @id @default(cuid())
+  companyId        String
+  email            String
+  passwordHash     String
+  role             String // "ADMIN" | "EMPLOYEE" | "KIOSK" (validar no codigo)
+  isActive         Boolean  @default(true)
+  refreshTokenHash String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company             Company                 @relation(fields: [companyId], references: [id])
+  employee            EmployeeProfile?
+  reviewedAdjustments TimeAdjustmentRequest[] @relation("ReviewedBy")
+  auditLogs           AuditLog[]
+
+  @@unique([companyId, email])
+  @@index([companyId])
+}
+
+model EmployeeProfile {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String   @unique
+  fullName  String
+  document  String?
+  isActive  Boolean  @default(true)
+  pinHash           String?
+  pinUpdatedAt      DateTime?
+  pinFailedAttempts Int      @default(0)
+  pinLockedUntil    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company     Company                 @relation(fields: [companyId], references: [id])
+  user        User                    @relation(fields: [userId], references: [id])
+  events      TimeClockEvent[]
+  adjustments TimeAdjustmentRequest[]
+
+  @@index([companyId])
+}
+
+model TimeClockEvent {
+  id         String @id @default(cuid())
+  companyId  String
+  employeeId String
+
+  type      String // "IN" | "OUT" | "BREAK_START" | "BREAK_END"
+  timestamp DateTime
+
+  source    String // "WEB" | "PWA" | "MOBILE" | "KIOSK"
+  ip        String?
+  userAgent String?
+  deviceId  String?
+
+  latitude          Float?
+  longitude         Float?
+  accuracy          Float?
+  geoCapturedAt     DateTime?
+  geoDistanceMeters Int?
+  geoStatus         String    @default("MISSING") // "OK" | "OUTSIDE" | "LOW_ACCURACY" | "MISSING"
+  blockedReason     String?
+  punchMethod       String    @default("GEO") // "GEO" | "QR" | "KIOSK"
+  qrDate            String?
+  qrNonce           String?
+
+  createdAt DateTime @default(now())
+
+  company     Company                 @relation(fields: [companyId], references: [id])
+  employee    EmployeeProfile         @relation(fields: [employeeId], references: [id])
+  adjustments TimeAdjustmentRequest[] @relation("OriginalEvent")
+
+  @@index([companyId, employeeId, timestamp])
+  @@index([employeeId, timestamp])
+}
+
+model TimeAdjustmentRequest {
+  id         String @id @default(cuid())
+  companyId  String
+  employeeId String
+
+  originalEventId String?
+
+  requestedType      String // mesmos valores de TimeClockEvent.type
+  requestedTimestamp DateTime
+  reason             String
+
+  status String // "PENDING" | "APPROVED" | "REJECTED"
+
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company       Company         @relation(fields: [companyId], references: [id])
+  employee      EmployeeProfile @relation(fields: [employeeId], references: [id])
+  originalEvent TimeClockEvent? @relation("OriginalEvent", fields: [originalEventId], references: [id])
+  reviewedBy    User?           @relation("ReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@index([companyId, employeeId])
+  @@index([status])
+}
+
+model AuditLog {
+  id        String  @id @default(cuid())
+  companyId String
+  userId    String?
+
+  action   String
+  entity   String
+  entityId String?
+
+  ip          String?
+  userAgent   String?
+  payloadJson String?
+
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([companyId])
+  @@index([userId])
+}
