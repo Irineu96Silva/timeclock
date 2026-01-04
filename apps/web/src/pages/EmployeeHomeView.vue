@@ -293,9 +293,10 @@ const closeQrFallback = (arg1?: Event | boolean, forceFallback = false) => {
 
 
 const handleRetryGeo = async (_e?: Event) => {
-  closeQrFallback();
+  closeQrFallback(true);
   await handlePunch();
 };
+
 
 
 const openQrScanner = () => {
