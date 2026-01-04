@@ -80,7 +80,8 @@
     class="btn btn-ghost"
     type="button"
     :disabled="qrSubmitting"
-    @click="handleRetryGeo"
+    @click="() => handleRetryGeo()"
+
   >
     {{ t("employee.qrFallback.retry") }}
   </button>
@@ -292,10 +293,11 @@ const closeQrFallback = (arg1?: Event | boolean, forceFallback = false) => {
 
 
 
-const handleRetryGeo = async (_e?: Event) => {
-  closeQrFallback(true);
+const handleRetryGeo = async () => {
+  closeQrFallback(undefined,true);
   await handlePunch();
 };
+
 
 
 
