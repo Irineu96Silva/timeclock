@@ -67,7 +67,7 @@
     </div>
   </section>
 
-    <div v-if="showQrFallback" class="modal-backdrop" @click.self="closeQrFallback">
+    <div v-if="showQrFallback" class="modal-backdrop" @click="handleQrFallbackBackdropClick">
       <div class="modal">
         <div class="modal-header">
           <h3>{{ t("employee.qrFallback.title") }}</h3>
@@ -287,6 +287,13 @@ const closeQrFallback = (_e?: Event) => {
   showQrFallback.value = false;
   qrFallbackError.value = "";
 };
+const handleQrFallbackBackdropClick = (event: MouseEvent) => {
+  if (event.target !== event.currentTarget) {
+    return;
+  }
+  closeQrFallback();
+};
+
 
 // Use esta função quando você precisar fechar "na marra" pelo código
 const forceCloseQrFallback = () => {
