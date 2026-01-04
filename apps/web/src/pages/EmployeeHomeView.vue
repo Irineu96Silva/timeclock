@@ -280,21 +280,25 @@ const openQrFallback = (message?: string) => {
   showQrFallback.value = true;
 };
 
-const closeQrFallback = (arg1?: Event | boolean, forceFallback = false) => {
-  const force = typeof arg1 === "boolean" ? arg1 : forceFallback;
+const closeQrFallback = (_e?: Event) => {
+  // Clique fora do modal (backdrop) só fecha se não estiver enviando
+  if (qrSubmitting.value) return;
 
-  if (qrSubmitting.value && !force) {
-    return;
-  }
+  showQrFallback.value = false;
+  qrFallbackError.value = "";
+};
 
+// Use esta função quando você precisar fechar "na marra" pelo código
+const forceCloseQrFallback = () => {
   showQrFallback.value = false;
   qrFallbackError.value = "";
 };
 
 
 
+
 const handleRetryGeo = async () => {
-  closeQrFallback(undefined,true);
+  closeQrFallback()
   await handlePunch();
 };
 
@@ -325,7 +329,7 @@ const handleQrScan = async (token: string) => {
     const time = formatTime(response.timestamp);
     feedback.value = t("employee.home.feedback", { type: formatType(response.type), time });
     await loadToday();
-    closeQrFallback(undefined, true);
+    closeQrFallback();
   } catch (err) {
     qrFallbackError.value = getErrorMessage(err);
   } finally {
