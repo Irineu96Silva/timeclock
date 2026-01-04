@@ -279,13 +279,17 @@ const openQrFallback = (message?: string) => {
   showQrFallback.value = true;
 };
 
-const closeQrFallback = (_e?: Event, force = false) => {
+const closeQrFallback = (arg1?: Event | boolean, forceFallback = false) => {
+  const force = typeof arg1 === "boolean" ? arg1 : forceFallback;
+
   if (qrSubmitting.value && !force) {
     return;
   }
+
   showQrFallback.value = false;
   qrFallbackError.value = "";
 };
+
 
 
 const handleRetryGeo = async (_e?: Event) => {
