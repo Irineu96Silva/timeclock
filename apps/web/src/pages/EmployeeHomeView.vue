@@ -67,33 +67,34 @@
     </div>
   </section>
 
-  <div v-if="showQrFallback" class="modal-backdrop" @click.self="closeQrFallback">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>{{ t("employee.qrFallback.title") }}</h3>
-        <p class="muted">{{ t("employee.qrFallback.subtitle") }}</p>
+    <div v-if="showQrFallback" class="modal-backdrop" @click.self="closeQrFallback">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>{{ t("employee.qrFallback.title") }}</h3>
+          <p class="muted">{{ t("employee.qrFallback.subtitle") }}</p>
+        </div>
+        <p v-if="qrSubmitting" class="muted">{{ t("employee.qrFallback.submitting") }}</p>
+        <div v-if="qrFallbackError" class="alert alert-warning">{{ qrFallbackError }}</div>
+        <div class="modal-actions">
+          <button
+    class="btn btn-ghost"
+    type="button"
+    :disabled="qrSubmitting"
+    @click="handleRetryGeo"
+  >
+    {{ t("employee.qrFallback.retry") }}
+  </button>
+
+          <button
+            class="btn btn-primary"
+            type="button"
+            :disabled="qrSubmitting"
+            @click="openQrScanner"
+          >
+            {{ t("employee.qrFallback.scan") }}
+          </button>
+        </div>
       </div>
-      <p v-if="qrSubmitting" class="muted">{{ t("employee.qrFallback.submitting") }}</p>
-      <div v-if="qrFallbackError" class="alert alert-warning">{{ qrFallbackError }}</div>
-      <div class="modal-actions">
-        <button
-          class="btn btn-ghost"
-          type="button"
-          :disabled="qrSubmitting"
-          @click="handleRetryGeo"
-        >
-          {{ t("employee.qrFallback.retry") }}
-        </button>
-        <button
-          class="btn btn-primary"
-          type="button"
-          :disabled="qrSubmitting"
-          @click="openQrScanner"
-        >
-          {{ t("employee.qrFallback.scan") }}
-        </button>
-      </div>
-    </div>
   </div>
 
   <QrScannerView v-if="showQrScanner" @scan="handleQrScan" @close="handleCloseScanner" />
@@ -278,7 +279,7 @@ const openQrFallback = (message?: string) => {
   showQrFallback.value = true;
 };
 
-const closeQrFallback = (force = false) => {
+const closeQrFallback = (_e?: Event, force = false) => {
   if (qrSubmitting.value && !force) {
     return;
   }
@@ -286,10 +287,12 @@ const closeQrFallback = (force = false) => {
   qrFallbackError.value = "";
 };
 
-const handleRetryGeo = async () => {
+
+const handleRetryGeo = async (_e?: Event) => {
   closeQrFallback();
   await handlePunch();
 };
+
 
 const openQrScanner = () => {
   qrFallbackError.value = "";
@@ -315,7 +318,7 @@ const handleQrScan = async (token: string) => {
     const time = formatTime(response.timestamp);
     feedback.value = t("employee.home.feedback", { type: formatType(response.type), time });
     await loadToday();
-    closeQrFallback(true);
+    closeQrFallback(undefined, true);
   } catch (err) {
     qrFallbackError.value = getErrorMessage(err);
   } finally {
