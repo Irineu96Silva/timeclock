@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsBoolean, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsInt, IsOptional, IsString, Min } from "class-validator";
 
 export class UpdateEmployeeDto {
   @IsOptional()
@@ -14,4 +14,30 @@ export class UpdateEmployeeDto {
   @IsBoolean()
   @Type(() => Boolean)
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  workStartTime?: string | null;
+
+  @IsOptional()
+  @IsString()
+  breakStartTime?: string | null;
+
+  @IsOptional()
+  @IsString()
+  breakEndTime?: string | null;
+
+  @IsOptional()
+  @IsString()
+  workEndTime?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  toleranceMinutes?: number | null;
+
+  @IsOptional()
+  @IsString()
+  timezone?: string | null;
 }

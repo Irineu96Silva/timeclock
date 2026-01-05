@@ -6,6 +6,7 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { AuthModule } from "./auth/auth.module";
 import { AdminDashboardModule } from "./admin-dashboard/admin-dashboard.module";
+import { AdminExportsModule } from "./admin-exports/admin-exports.module";
 import { AdminKioskModule } from "./admin-kiosk/admin-kiosk.module";
 import { AdminSettingsModule } from "./admin-settings/admin-settings.module";
 import { EmployeesModule } from "./employees/employees.module";
@@ -27,6 +28,7 @@ import { TimeClockModule } from "./timeclock/timeclock.module";
     PrismaModule,
     AuthModule,
     AdminDashboardModule,
+    AdminExportsModule,
     AdminKioskModule,
     AdminSettingsModule,
     EmployeesModule,

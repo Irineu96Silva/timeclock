@@ -39,6 +39,54 @@
           />
         </label>
 
+        <div class="section">
+          <h3 class="section-title">{{ t("admin.employees.schedule.title") }}</h3>
+          <p class="section-subtitle">{{ t("admin.employees.schedule.subtitle") }}</p>
+
+          <div class="form-row">
+            <label class="field">
+              <span class="label">{{ t("admin.employees.schedule.workStart") }}</span>
+              <input v-model="form.workStartTime" class="input" type="time" step="60" />
+            </label>
+            <label class="field">
+              <span class="label">{{ t("admin.employees.schedule.workEnd") }}</span>
+              <input v-model="form.workEndTime" class="input" type="time" step="60" />
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="field">
+              <span class="label">{{ t("admin.employees.schedule.breakStart") }}</span>
+              <input v-model="form.breakStartTime" class="input" type="time" step="60" />
+            </label>
+            <label class="field">
+              <span class="label">{{ t("admin.employees.schedule.breakEnd") }}</span>
+              <input v-model="form.breakEndTime" class="input" type="time" step="60" />
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="field">
+              <span class="label">{{ t("admin.employees.schedule.tolerance") }}</span>
+              <input
+                v-model.number="form.toleranceMinutes"
+                class="input"
+                type="number"
+                min="0"
+              />
+            </label>
+            <label class="field">
+              <span class="label">{{ t("admin.employees.schedule.timezone") }}</span>
+              <input
+                v-model="form.timezone"
+                class="input"
+                type="text"
+                :placeholder="t('admin.employees.schedule.timezonePlaceholder')"
+              />
+            </label>
+          </div>
+        </div>
+
         <button class="btn btn-primary btn-block" type="submit" :disabled="creating">
           {{ creating ? t("admin.employees.creatingButton") : t("admin.employees.createButton") }}
         </button>
@@ -59,54 +107,63 @@
       </div>
 
       <div v-if="loading" class="muted">{{ t("admin.employees.loading") }}</div>
-      <div v-else class="list">
+      <div v-else class="list-scroll">
         <div v-if="employees.length === 0" class="muted">
           {{ t("admin.employees.empty") }}
         </div>
-        <div v-for="employee in employees" :key="employee.id" class="list-item">
-          <div>
-            <strong>{{ employee.fullName }}</strong>
-            <p class="muted">{{ employee.user.email }}</p>
-          </div>
-          <div class="list-actions">
-            <div class="badge-group">
-              <span class="badge badge--info">{{ roleLabel(employee.user.role) }}</span>
-              <span
-                :class="[
-                  'badge',
-                  employee.isActive ? 'badge--success' : 'badge--danger',
-                ]"
-              >
-                {{ employee.isActive ? t("badges.active") : t("badges.inactive") }}
-              </span>
+        <div v-else class="list">
+          <div v-for="employee in employees" :key="employee.id" class="list-item">
+            <div>
+              <strong>{{ employee.fullName }}</strong>
+              <p class="muted">{{ employee.user.email }}</p>
             </div>
             <div class="list-actions">
-              <button
-                class="btn btn-ghost btn-sm"
-                type="button"
-                @click="openPinModal(employee)"
-              >
-                {{ t("admin.employees.setPin") }}
-              </button>
-              <button
-                class="btn btn-ghost btn-sm"
-                type="button"
-                @click="handleGenerateQr(employee)"
-              >
-                {{ t("admin.employees.generateQr") }}
-              </button>
-              <button
-                class="btn btn-ghost btn-sm"
-                type="button"
-                :disabled="resettingId === employee.id"
-                @click="handleResetPassword(employee)"
-              >
-                {{
-                  resettingId === employee.id
-                    ? t("admin.employees.resettingPassword")
-                    : t("admin.employees.resetPassword")
-                }}
-              </button>
+              <div class="badge-group">
+                <span class="badge badge--info">{{ roleLabel(employee.user.role) }}</span>
+                <span
+                  :class="[
+                    'badge',
+                    employee.isActive ? 'badge--success' : 'badge--danger',
+                  ]"
+                >
+                  {{ employee.isActive ? t("badges.active") : t("badges.inactive") }}
+                </span>
+              </div>
+              <div class="list-action-buttons">
+                <button
+                  class="btn btn-ghost btn-sm"
+                  type="button"
+                  @click="openScheduleModal(employee)"
+                >
+                  {{ t("admin.employees.schedule.editButton") }}
+                </button>
+                <button
+                  class="btn btn-ghost btn-sm"
+                  type="button"
+                  @click="openPinModal(employee)"
+                >
+                  {{ t("admin.employees.setPin") }}
+                </button>
+                <button
+                  class="btn btn-ghost btn-sm"
+                  type="button"
+                  @click="handleGenerateQr(employee)"
+                >
+                  {{ t("admin.employees.generateQr") }}
+                </button>
+                <button
+                  class="btn btn-ghost btn-sm"
+                  type="button"
+                  :disabled="resettingId === employee.id"
+                  @click="handleResetPassword(employee)"
+                >
+                  {{
+                    resettingId === employee.id
+                      ? t("admin.employees.resettingPassword")
+                      : t("admin.employees.resetPassword")
+                  }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -200,6 +257,90 @@
     </div>
   </div>
 
+  <div v-if="scheduleModal" class="modal-backdrop" @click.self="closeScheduleModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>{{ t("admin.employees.schedule.modalTitle") }}</h3>
+        <p>
+          {{
+            t("admin.employees.schedule.modalSubtitle", {
+              name: scheduleModal.fullName,
+            })
+          }}
+        </p>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label class="field">
+            <span class="label">{{ t("admin.employees.schedule.workStart") }}</span>
+            <input v-model="scheduleForm.workStartTime" class="input" type="time" step="60" />
+          </label>
+          <label class="field">
+            <span class="label">{{ t("admin.employees.schedule.workEnd") }}</span>
+            <input v-model="scheduleForm.workEndTime" class="input" type="time" step="60" />
+          </label>
+        </div>
+
+        <div class="form-row">
+          <label class="field">
+            <span class="label">{{ t("admin.employees.schedule.breakStart") }}</span>
+            <input v-model="scheduleForm.breakStartTime" class="input" type="time" step="60" />
+          </label>
+          <label class="field">
+            <span class="label">{{ t("admin.employees.schedule.breakEnd") }}</span>
+            <input v-model="scheduleForm.breakEndTime" class="input" type="time" step="60" />
+          </label>
+        </div>
+
+        <div class="form-row">
+          <label class="field">
+            <span class="label">{{ t("admin.employees.schedule.tolerance") }}</span>
+            <input
+              v-model.number="scheduleForm.toleranceMinutes"
+              class="input"
+              type="number"
+              min="0"
+            />
+          </label>
+          <label class="field">
+            <span class="label">{{ t("admin.employees.schedule.timezone") }}</span>
+            <input
+              v-model="scheduleForm.timezone"
+              class="input"
+              type="text"
+              :placeholder="t('admin.employees.schedule.timezonePlaceholder')"
+            />
+          </label>
+        </div>
+
+        <div v-if="scheduleError" class="alert alert-error">{{ scheduleError }}</div>
+        <div v-if="scheduleSuccess" class="alert alert-success">{{ scheduleSuccess }}</div>
+      </div>
+      <div class="modal-actions">
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="scheduleSaving"
+          @click="handleSaveSchedule"
+        >
+          {{
+            scheduleSaving
+              ? t("admin.employees.schedule.saving")
+              : t("admin.employees.schedule.save")
+          }}
+        </button>
+        <button
+          class="btn btn-ghost"
+          type="button"
+          :disabled="scheduleSaving"
+          @click="closeScheduleModal"
+        >
+          {{ t("admin.employees.schedule.close") }}
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div v-if="qrModal" class="modal-backdrop" @click.self="closeQrModal">
     <div class="modal">
       <div class="modal-header">
@@ -239,6 +380,12 @@ type EmployeeItem = {
   fullName: string;
   document: string | null;
   isActive: boolean;
+  workStartTime: string | null;
+  breakStartTime: string | null;
+  breakEndTime: string | null;
+  workEndTime: string | null;
+  toleranceMinutes: number | null;
+  timezone: string | null;
   user: {
     id: string;
     email: string;
@@ -273,11 +420,30 @@ const qrModal = ref<EmployeeItem | null>(null);
 const qrToken = ref("");
 const copiedQr = ref(false);
 const qrCanvasRef = ref<HTMLCanvasElement | null>(null);
+const scheduleModal = ref<EmployeeItem | null>(null);
+const scheduleSaving = ref(false);
+const scheduleError = ref("");
+const scheduleSuccess = ref("");
 
 const form = reactive({
   fullName: "",
   email: "",
   document: "",
+  workStartTime: "",
+  breakStartTime: "",
+  breakEndTime: "",
+  workEndTime: "",
+  toleranceMinutes: 5 as number | null,
+  timezone: "",
+});
+
+const scheduleForm = reactive({
+  workStartTime: "",
+  breakStartTime: "",
+  breakEndTime: "",
+  workEndTime: "",
+  toleranceMinutes: 5 as number | null,
+  timezone: "",
 });
 
 const loadEmployees = async () => {
@@ -301,6 +467,12 @@ const handleCreate = async () => {
       fullName: form.fullName,
       email: form.email,
       document: form.document || undefined,
+      workStartTime: form.workStartTime || undefined,
+      breakStartTime: form.breakStartTime || undefined,
+      breakEndTime: form.breakEndTime || undefined,
+      workEndTime: form.workEndTime || undefined,
+      toleranceMinutes: form.toleranceMinutes ?? undefined,
+      timezone: form.timezone.trim() || undefined,
     };
     const response = await api.post<CreateEmployeeResponse>("/employees", payload);
 
@@ -311,6 +483,12 @@ const handleCreate = async () => {
     form.fullName = "";
     form.email = "";
     form.document = "";
+    form.workStartTime = "";
+    form.breakStartTime = "";
+    form.breakEndTime = "";
+    form.workEndTime = "";
+    form.toleranceMinutes = 5;
+    form.timezone = "";
 
     await loadEmployees();
   } catch (err) {
@@ -381,12 +559,30 @@ const openPinModal = (employee: EmployeeItem) => {
   temporaryPin.value = null;
 };
 
+const openScheduleModal = (employee: EmployeeItem) => {
+  scheduleModal.value = employee;
+  scheduleError.value = "";
+  scheduleSuccess.value = "";
+  scheduleForm.workStartTime = employee.workStartTime ?? "";
+  scheduleForm.breakStartTime = employee.breakStartTime ?? "";
+  scheduleForm.breakEndTime = employee.breakEndTime ?? "";
+  scheduleForm.workEndTime = employee.workEndTime ?? "";
+  scheduleForm.toleranceMinutes = employee.toleranceMinutes ?? 5;
+  scheduleForm.timezone = employee.timezone ?? "";
+};
+
 const closePinModal = () => {
   pinModal.value = null;
   pinValue.value = "";
   pinError.value = "";
   pinSuccess.value = "";
   temporaryPin.value = null;
+};
+
+const closeScheduleModal = () => {
+  scheduleModal.value = null;
+  scheduleError.value = "";
+  scheduleSuccess.value = "";
 };
 
 const handleSavePin = async () => {
@@ -427,6 +623,38 @@ const handleResetPin = async () => {
     pinError.value = getErrorMessage(err);
   } finally {
     pinResetting.value = false;
+  }
+};
+
+const handleSaveSchedule = async () => {
+  if (!scheduleModal.value) {
+    return;
+  }
+  scheduleError.value = "";
+  scheduleSuccess.value = "";
+  scheduleSaving.value = true;
+  try {
+    const toleranceValue =
+      scheduleForm.toleranceMinutes === null || scheduleForm.toleranceMinutes === undefined
+        ? null
+        : Number.isFinite(scheduleForm.toleranceMinutes)
+          ? scheduleForm.toleranceMinutes
+          : null;
+    const payload = {
+      workStartTime: scheduleForm.workStartTime || null,
+      breakStartTime: scheduleForm.breakStartTime || null,
+      breakEndTime: scheduleForm.breakEndTime || null,
+      workEndTime: scheduleForm.workEndTime || null,
+      toleranceMinutes: toleranceValue,
+      timezone: scheduleForm.timezone.trim() || null,
+    };
+    await api.patch(`/employees/${scheduleModal.value.id}`, payload);
+    scheduleSuccess.value = t("admin.employees.schedule.saved");
+    await loadEmployees();
+  } catch (err) {
+    scheduleError.value = getErrorMessage(err);
+  } finally {
+    scheduleSaving.value = false;
   }
 };
 

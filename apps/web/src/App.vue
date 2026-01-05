@@ -20,6 +20,9 @@
         <router-link class="admin-nav__link" to="/admin/settings">
           {{ t("admin.menu.settings") }}
         </router-link>
+        <router-link class="admin-nav__link" to="/admin/exports">
+          {{ t("admin.menu.exports") }}
+        </router-link>
       </nav>
       <router-view />
     </main>

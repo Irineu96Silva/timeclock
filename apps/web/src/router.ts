@@ -22,6 +22,11 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/admin/exports",
+    component: () => import("./pages/AdminExportsView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/employee/home",
     component: () => import("./pages/EmployeeHomeView.vue"),
     meta: { requiresAuth: true },

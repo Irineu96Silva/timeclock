@@ -92,10 +92,58 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function requestBlob(path: string, options: RequestInit = {}): Promise<Blob> {
+  const headers = new Headers(options.headers);
+  if (!headers.has("Content-Type") && options.body) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const token = getAccessToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    let message = response.statusText;
+    let code: string | undefined;
+    let details: unknown;
+    try {
+      const data = (await response.json()) as {
+        message?: string | string[];
+        error?: string;
+        code?: string;
+        details?: unknown;
+      };
+      if (data?.message) {
+        message = Array.isArray(data.message) ? data.message.join(", ") : data.message;
+      }
+      code = data?.code || data?.error;
+      details = data?.details;
+    } catch {
+      // ignore json parse errors
+    }
+    if (response.status === 401) {
+      clearAccessToken();
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
+    throw new ApiError(message, response.status, code, details);
+  }
+
+  return response.blob();
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, body ? { method: "POST", body: JSON.stringify(body) } : { method: "POST" }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, body ? { method: "PATCH", body: JSON.stringify(body) } : { method: "PATCH" }),
+  getBlob: (path: string) => requestBlob(path),
 };

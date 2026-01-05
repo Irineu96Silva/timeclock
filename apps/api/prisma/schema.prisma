@@ -1,11 +1,15 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
+
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
+
+
 
 
 model Company {
@@ -63,6 +67,12 @@ model EmployeeProfile {
   userId    String   @unique
   fullName  String
   document  String?
+  workStartTime    String?
+  breakStartTime   String?
+  breakEndTime     String?
+  workEndTime      String?
+  toleranceMinutes Int?     @default(5)
+  timezone         String?  @default("America/Sao_Paulo")
   isActive  Boolean  @default(true)
   pinHash           String?
   pinUpdatedAt      DateTime?

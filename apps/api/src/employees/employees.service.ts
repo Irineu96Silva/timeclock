@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { buildEmployeeQrToken } from "../utils/qr-signing";
+import { isValidTimeString, parseTimeToMinutes, resolveTimeZone } from "../utils/time-utils";
 import { CreateEmployeeDto } from "./dto/create-employee.dto";
 import { SetEmployeePinDto } from "./dto/set-employee-pin.dto";
 import { UpdateEmployeeDto } from "./dto/update-employee.dto";
@@ -20,6 +21,30 @@ type EmployeeListItem = {
     role: string;
     isActive: boolean;
   };
+  workStartTime: string | null;
+  breakStartTime: string | null;
+  breakEndTime: string | null;
+  workEndTime: string | null;
+  toleranceMinutes: number | null;
+  timezone: string | null;
+};
+
+type ScheduleSnapshot = {
+  workStartTime: string | null;
+  breakStartTime: string | null;
+  breakEndTime: string | null;
+  workEndTime: string | null;
+  toleranceMinutes: number | null;
+  timezone: string | null;
+};
+
+type NormalizedScheduleInput = {
+  workStartTime?: string | null;
+  breakStartTime?: string | null;
+  breakEndTime?: string | null;
+  workEndTime?: string | null;
+  toleranceMinutes?: number | null;
+  timezone?: string | null;
 };
 
 const TEMP_PASSWORD_LENGTH = 12;
@@ -35,6 +60,9 @@ export class EmployeesService {
     const fullName = dto.fullName.trim();
     const tempPassword = dto.password?.trim() || this.generateTemporaryPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 10);
+    const scheduleInput = this.normalizeScheduleInput(dto);
+    const schedule = this.mergeSchedule(this.emptySchedule(), scheduleInput);
+    this.validateSchedule(schedule);
 
     try {
       const { user, employee } = await this.prisma.$transaction(async (tx) => {
@@ -48,15 +76,25 @@ export class EmployeesService {
           },
         });
 
-        const employee = await tx.employeeProfile.create({
-          data: {
-            companyId: admin.companyId,
-            userId: user.id,
-            fullName,
-            document: dto.document?.trim(),
-            isActive: true,
-          },
-        });
+        const employeeData: Prisma.EmployeeProfileCreateInput = {
+          companyId: admin.companyId,
+          userId: user.id,
+          fullName,
+          document: dto.document?.trim(),
+          isActive: true,
+          workStartTime: schedule.workStartTime,
+          breakStartTime: schedule.breakStartTime,
+          breakEndTime: schedule.breakEndTime,
+          workEndTime: schedule.workEndTime,
+        };
+        if (scheduleInput.toleranceMinutes !== undefined && scheduleInput.toleranceMinutes !== null) {
+          employeeData.toleranceMinutes = scheduleInput.toleranceMinutes;
+        }
+        if (scheduleInput.timezone !== undefined && scheduleInput.timezone !== null) {
+          employeeData.timezone = scheduleInput.timezone;
+        }
+
+        const employee = await tx.employeeProfile.create({ data: employeeData });
 
         await tx.auditLog.create({
           data: {
@@ -94,6 +132,12 @@ export class EmployeesService {
         fullName: true,
         document: true,
         isActive: true,
+        workStartTime: true,
+        breakStartTime: true,
+        breakEndTime: true,
+        workEndTime: true,
+        toleranceMinutes: true,
+        timezone: true,
         user: {
           select: {
             id: true,
@@ -116,13 +160,30 @@ export class EmployeesService {
       throw new NotFoundException("Employee not found");
     }
 
+    const scheduleInput = this.normalizeScheduleInput(dto);
+    const schedule = this.mergeSchedule(
+      {
+        workStartTime: employee.workStartTime,
+        breakStartTime: employee.breakStartTime,
+        breakEndTime: employee.breakEndTime,
+        workEndTime: employee.workEndTime,
+        toleranceMinutes: employee.toleranceMinutes,
+        timezone: employee.timezone,
+      },
+      scheduleInput,
+    );
+    this.validateSchedule(schedule);
+
+    const data: Prisma.EmployeeProfileUpdateInput = {
+      fullName: dto.fullName?.trim(),
+      document: dto.document?.trim(),
+      isActive: dto.isActive,
+    };
+    this.applyScheduleUpdates(dto, scheduleInput, data);
+
     const updated = await this.prisma.employeeProfile.update({
       where: { id: employee.id },
-      data: {
-        fullName: dto.fullName?.trim(),
-        document: dto.document?.trim(),
-        isActive: dto.isActive,
-      },
+      data,
     });
 
     await this.prisma.auditLog.create({
@@ -312,5 +373,153 @@ export class EmployeesService {
         kioskDeviceLabel: "",
       },
     });
+  }
+
+  private emptySchedule(): ScheduleSnapshot {
+    return {
+      workStartTime: null,
+      breakStartTime: null,
+      breakEndTime: null,
+      workEndTime: null,
+      toleranceMinutes: null,
+      timezone: null,
+    };
+  }
+
+  private normalizeScheduleInput(
+    input: Partial<ScheduleSnapshot>,
+  ): NormalizedScheduleInput {
+    return {
+      workStartTime: this.normalizeTimeInput(input.workStartTime),
+      breakStartTime: this.normalizeTimeInput(input.breakStartTime),
+      breakEndTime: this.normalizeTimeInput(input.breakEndTime),
+      workEndTime: this.normalizeTimeInput(input.workEndTime),
+      toleranceMinutes: this.normalizeNumberInput(input.toleranceMinutes),
+      timezone: this.normalizeTimezoneInput(input.timezone),
+    };
+  }
+
+  private normalizeTimeInput(value?: string | null) {
+    if (value === undefined) {
+      return undefined;
+    }
+    if (value === null) {
+      return null;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    return trimmed;
+  }
+
+  private normalizeTimezoneInput(value?: string | null) {
+    if (value === undefined) {
+      return undefined;
+    }
+    if (value === null) {
+      return null;
+    }
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  private normalizeNumberInput(value?: number | null) {
+    if (value === undefined) {
+      return undefined;
+    }
+    if (value === null) {
+      return null;
+    }
+    return Number.isNaN(value) ? null : value;
+  }
+
+  private mergeSchedule(
+    current: ScheduleSnapshot,
+    input: NormalizedScheduleInput,
+  ): ScheduleSnapshot {
+    return {
+      workStartTime:
+        input.workStartTime !== undefined ? input.workStartTime : current.workStartTime,
+      breakStartTime:
+        input.breakStartTime !== undefined ? input.breakStartTime : current.breakStartTime,
+      breakEndTime:
+        input.breakEndTime !== undefined ? input.breakEndTime : current.breakEndTime,
+      workEndTime: input.workEndTime !== undefined ? input.workEndTime : current.workEndTime,
+      toleranceMinutes:
+        input.toleranceMinutes !== undefined ? input.toleranceMinutes : current.toleranceMinutes,
+      timezone: input.timezone !== undefined ? input.timezone : current.timezone,
+    };
+  }
+
+  private validateSchedule(schedule: ScheduleSnapshot) {
+    const timeValues = [
+      schedule.workStartTime,
+      schedule.breakStartTime,
+      schedule.breakEndTime,
+      schedule.workEndTime,
+    ];
+
+    for (const value of timeValues) {
+      if (value && !isValidTimeString(value)) {
+        throw new BadRequestException("Horario invalido.");
+      }
+    }
+
+    const hasBreakStart = Boolean(schedule.breakStartTime);
+    const hasBreakEnd = Boolean(schedule.breakEndTime);
+    if (hasBreakStart !== hasBreakEnd) {
+      throw new BadRequestException("Informe inicio e fim da pausa.");
+    }
+
+    const hasWorkStart = Boolean(schedule.workStartTime);
+    const hasWorkEnd = Boolean(schedule.workEndTime);
+    if (hasWorkStart !== hasWorkEnd) {
+      throw new BadRequestException("Informe inicio e fim da jornada.");
+    }
+
+    if (schedule.workStartTime && schedule.workEndTime) {
+      if (parseTimeToMinutes(schedule.workStartTime) >= parseTimeToMinutes(schedule.workEndTime)) {
+        throw new BadRequestException("Horario de trabalho invalido.");
+      }
+    }
+
+    if (schedule.breakStartTime && schedule.breakEndTime) {
+      if (
+        parseTimeToMinutes(schedule.breakStartTime) >=
+        parseTimeToMinutes(schedule.breakEndTime)
+      ) {
+        throw new BadRequestException("Horario de pausa invalido.");
+      }
+    }
+
+    if (schedule.timezone && !resolveTimeZone(schedule.timezone)) {
+      throw new BadRequestException("Timezone invalido.");
+    }
+  }
+
+  private applyScheduleUpdates(
+    dto: UpdateEmployeeDto,
+    scheduleInput: NormalizedScheduleInput,
+    data: Prisma.EmployeeProfileUpdateInput,
+  ) {
+    if (Object.prototype.hasOwnProperty.call(dto, "workStartTime")) {
+      data.workStartTime = scheduleInput.workStartTime ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(dto, "breakStartTime")) {
+      data.breakStartTime = scheduleInput.breakStartTime ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(dto, "breakEndTime")) {
+      data.breakEndTime = scheduleInput.breakEndTime ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(dto, "workEndTime")) {
+      data.workEndTime = scheduleInput.workEndTime ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(dto, "toleranceMinutes")) {
+      data.toleranceMinutes = scheduleInput.toleranceMinutes ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(dto, "timezone")) {
+      data.timezone = scheduleInput.timezone ?? null;
+    }
   }
 }
