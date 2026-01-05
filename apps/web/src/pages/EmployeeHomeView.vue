@@ -80,7 +80,8 @@
     class="btn btn-ghost"
     type="button"
     :disabled="qrSubmitting"
-    @click="() => handleRetryGeo()"
+    @click="handleRetryGeo"
+
 
   >
     {{ t("employee.qrFallback.retry") }}

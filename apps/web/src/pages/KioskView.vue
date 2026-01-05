@@ -518,15 +518,15 @@ const startFaceDetection = async () => {
 
   try {
     detector = new FaceDetection({
-      locateFile: (file) =>
-        new URL(`@mediapipe/face_detection/${file}`, import.meta.url).toString(),
-    });
-    detector.setOptions({ model: "short", minDetectionConfidence: 0.5 });
-    detector.onResults((results) => {
-      if (results.detections && results.detections.length > 0) {
-        markPresence();
-      }
-    });
+  locateFile: (file) =>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`,
+});
+detector.setOptions({ model: "short", minDetectionConfidence: 0.5 });
+detector.onResults((results) => {
+  if (results.detections && results.detections.length > 0) {
+    markPresence();
+  }
+});
 
     camera = new Camera(videoRef.value, {
       onFrame: async () => {
