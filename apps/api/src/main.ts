@@ -6,23 +6,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: (origin, cb) => {
-      const allowedOrigins = [
-        "http://localhost:5173",
-        "https://timeclock-web.vercel.app",
-      ];
-
-      // permite chamadas sem origin (ex: healthcheck, Postman)
-      if (!origin) return cb(null, true);
-
-      // permite localhost e seu domínio principal
-      if (allowedOrigins.includes(origin)) return cb(null, true);
-
-      // permite previews da Vercel (qualquer subdomínio *.vercel.app)
-      if (origin.endsWith(".vercel.app")) return cb(null, true);
-
-      return cb(new Error("Not allowed by CORS"), false);
-    },
+    origin: [
+      "http://localhost:5173",
+      "https://timeclock-web.vercel.app",
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -35,8 +22,11 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
+  const port = Number(process.env.PORT) || 3000;
+
+  // ✅ essencial em produção (Render)
+  await app.listen(port, "0.0.0.0");
+
   console.log(`API listening on ${port}`);
 }
 
