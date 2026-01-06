@@ -1,4 +1,11 @@
-const API_BASE_URL = "http://localhost:3000";
+// apps/web/src/services/api.ts
+
+// Em DEV (local) você usa localhost.
+// Em PROD (Vercel) você define VITE_API_URL nas Environment Variables.
+const API_BASE_URL =
+  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ||
+  "http://localhost:3000";
+
 const ACCESS_TOKEN_KEY = "access_token";
 const USER_ROLE_KEY = "user_role";
 
@@ -61,6 +68,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     let message = response.statusText;
     let code: string | undefined;
     let details: unknown;
+
     try {
       const data = (await response.json()) as {
         message?: string | string[];
@@ -68,20 +76,24 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         code?: string;
         details?: unknown;
       };
+
       if (data?.message) {
         message = Array.isArray(data.message) ? data.message.join(", ") : data.message;
       }
+
       code = data?.code || data?.error;
       details = data?.details;
     } catch {
-      // ignore json parse errors
+      // ignora erro de parse
     }
+
     if (response.status === 401) {
       clearAccessToken();
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
     }
+
     throw new ApiError(message, response.status, code, details);
   }
 
@@ -112,6 +124,7 @@ async function requestBlob(path: string, options: RequestInit = {}): Promise<Blo
     let message = response.statusText;
     let code: string | undefined;
     let details: unknown;
+
     try {
       const data = (await response.json()) as {
         message?: string | string[];
@@ -119,20 +132,24 @@ async function requestBlob(path: string, options: RequestInit = {}): Promise<Blo
         code?: string;
         details?: unknown;
       };
+
       if (data?.message) {
         message = Array.isArray(data.message) ? data.message.join(", ") : data.message;
       }
+
       code = data?.code || data?.error;
       details = data?.details;
     } catch {
-      // ignore json parse errors
+      // ignora erro de parse
     }
+
     if (response.status === 401) {
       clearAccessToken();
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
     }
+
     throw new ApiError(message, response.status, code, details);
   }
 
