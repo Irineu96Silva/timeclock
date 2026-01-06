@@ -60,6 +60,7 @@ export class EmployeesService {
     const fullName = dto.fullName.trim();
     const tempPassword = dto.password?.trim() || this.generateTemporaryPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 10);
+
     const scheduleInput = this.normalizeScheduleInput(dto);
     const schedule = this.mergeSchedule(this.emptySchedule(), scheduleInput);
     this.validateSchedule(schedule);
@@ -76,25 +77,21 @@ export class EmployeesService {
           },
         });
 
-        const employeeData: Prisma.EmployeeProfileCreateInput = {
-          companyId: admin.companyId,
-          userId: user.id,
-          fullName,
-          document: dto.document?.trim(),
-          isActive: true,
-          workStartTime: schedule.workStartTime,
-          breakStartTime: schedule.breakStartTime,
-          breakEndTime: schedule.breakEndTime,
-          workEndTime: schedule.workEndTime,
-        };
-        if (scheduleInput.toleranceMinutes !== undefined && scheduleInput.toleranceMinutes !== null) {
-          employeeData.toleranceMinutes = scheduleInput.toleranceMinutes;
-        }
-        if (scheduleInput.timezone !== undefined && scheduleInput.timezone !== null) {
-          employeeData.timezone = scheduleInput.timezone;
-        }
-
-        const employee = await tx.employeeProfile.create({ data: employeeData });
+        const employee = await tx.employeeProfile.create({
+          data: {
+            company: { connect: { id: admin.companyId } },
+            user: { connect: { id: user.id } },
+            fullName,
+            document: dto.document?.trim() || null,
+            isActive: true,
+            workStartTime: schedule.workStartTime,
+            breakStartTime: schedule.breakStartTime,
+            breakEndTime: schedule.breakEndTime,
+            workEndTime: schedule.workEndTime,
+            toleranceMinutes: schedule.toleranceMinutes ?? 5,
+            timezone: schedule.timezone ?? "America/Sao_Paulo",
+          },
+        });
 
         await tx.auditLog.create({
           data: {
@@ -125,7 +122,7 @@ export class EmployeesService {
   }
 
   async findAll(admin: AuthenticatedUser): Promise<EmployeeListItem[]> {
-    return this.prisma.employeeProfile.findMany({
+    const rows = await this.prisma.employeeProfile.findMany({
       where: { companyId: admin.companyId },
       select: {
         id: true,
@@ -149,6 +146,8 @@ export class EmployeesService {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    return rows;
   }
 
   async update(id: string, dto: UpdateEmployeeDto, admin: AuthenticatedUser) {
@@ -163,15 +162,16 @@ export class EmployeesService {
     const scheduleInput = this.normalizeScheduleInput(dto);
     const schedule = this.mergeSchedule(
       {
-        workStartTime: employee.workStartTime,
-        breakStartTime: employee.breakStartTime,
-        breakEndTime: employee.breakEndTime,
-        workEndTime: employee.workEndTime,
-        toleranceMinutes: employee.toleranceMinutes,
-        timezone: employee.timezone,
+        workStartTime: employee.workStartTime ?? null,
+        breakStartTime: employee.breakStartTime ?? null,
+        breakEndTime: employee.breakEndTime ?? null,
+        workEndTime: employee.workEndTime ?? null,
+        toleranceMinutes: employee.toleranceMinutes ?? null,
+        timezone: employee.timezone ?? null,
       },
       scheduleInput,
     );
+
     this.validateSchedule(schedule);
 
     const data: Prisma.EmployeeProfileUpdateInput = {
@@ -179,6 +179,7 @@ export class EmployeesService {
       document: dto.document?.trim(),
       isActive: dto.isActive,
     };
+
     this.applyScheduleUpdates(dto, scheduleInput, data);
 
     const updated = await this.prisma.employeeProfile.update({
@@ -202,9 +203,7 @@ export class EmployeesService {
   async resetPassword(id: string, admin: AuthenticatedUser) {
     const employee = await this.prisma.employeeProfile.findFirst({
       where: { id, companyId: admin.companyId },
-      include: {
-        user: true,
-      },
+      include: { user: true },
     });
 
     if (!employee) {
@@ -386,9 +385,7 @@ export class EmployeesService {
     };
   }
 
-  private normalizeScheduleInput(
-    input: Partial<ScheduleSnapshot>,
-  ): NormalizedScheduleInput {
+  private normalizeScheduleInput(input: Partial<ScheduleSnapshot>): NormalizedScheduleInput {
     return {
       workStartTime: this.normalizeTimeInput(input.workStartTime),
       breakStartTime: this.normalizeTimeInput(input.breakStartTime),
@@ -400,51 +397,34 @@ export class EmployeesService {
   }
 
   private normalizeTimeInput(value?: string | null) {
-    if (value === undefined) {
-      return undefined;
-    }
-    if (value === null) {
-      return null;
-    }
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+
     const trimmed = value.trim();
-    if (!trimmed) {
-      return null;
-    }
-    return trimmed;
+    return trimmed ? trimmed : null;
   }
 
   private normalizeTimezoneInput(value?: string | null) {
-    if (value === undefined) {
-      return undefined;
-    }
-    if (value === null) {
-      return null;
-    }
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+
     const trimmed = value.trim();
     return trimmed ? trimmed : null;
   }
 
   private normalizeNumberInput(value?: number | null) {
-    if (value === undefined) {
-      return undefined;
-    }
-    if (value === null) {
-      return null;
-    }
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+
     return Number.isNaN(value) ? null : value;
   }
 
-  private mergeSchedule(
-    current: ScheduleSnapshot,
-    input: NormalizedScheduleInput,
-  ): ScheduleSnapshot {
+  private mergeSchedule(current: ScheduleSnapshot, input: NormalizedScheduleInput): ScheduleSnapshot {
     return {
-      workStartTime:
-        input.workStartTime !== undefined ? input.workStartTime : current.workStartTime,
+      workStartTime: input.workStartTime !== undefined ? input.workStartTime : current.workStartTime,
       breakStartTime:
         input.breakStartTime !== undefined ? input.breakStartTime : current.breakStartTime,
-      breakEndTime:
-        input.breakEndTime !== undefined ? input.breakEndTime : current.breakEndTime,
+      breakEndTime: input.breakEndTime !== undefined ? input.breakEndTime : current.breakEndTime,
       workEndTime: input.workEndTime !== undefined ? input.workEndTime : current.workEndTime,
       toleranceMinutes:
         input.toleranceMinutes !== undefined ? input.toleranceMinutes : current.toleranceMinutes,
@@ -486,8 +466,7 @@ export class EmployeesService {
 
     if (schedule.breakStartTime && schedule.breakEndTime) {
       if (
-        parseTimeToMinutes(schedule.breakStartTime) >=
-        parseTimeToMinutes(schedule.breakEndTime)
+        parseTimeToMinutes(schedule.breakStartTime) >= parseTimeToMinutes(schedule.breakEndTime)
       ) {
         throw new BadRequestException("Horario de pausa invalido.");
       }
@@ -504,22 +483,32 @@ export class EmployeesService {
     data: Prisma.EmployeeProfileUpdateInput,
   ) {
     if (Object.prototype.hasOwnProperty.call(dto, "workStartTime")) {
-      data.workStartTime = scheduleInput.workStartTime ?? null;
+      data.workStartTime =
+        scheduleInput.workStartTime === undefined ? undefined : scheduleInput.workStartTime;
     }
+
     if (Object.prototype.hasOwnProperty.call(dto, "breakStartTime")) {
-      data.breakStartTime = scheduleInput.breakStartTime ?? null;
+      data.breakStartTime =
+        scheduleInput.breakStartTime === undefined ? undefined : scheduleInput.breakStartTime;
     }
+
     if (Object.prototype.hasOwnProperty.call(dto, "breakEndTime")) {
-      data.breakEndTime = scheduleInput.breakEndTime ?? null;
+      data.breakEndTime =
+        scheduleInput.breakEndTime === undefined ? undefined : scheduleInput.breakEndTime;
     }
+
     if (Object.prototype.hasOwnProperty.call(dto, "workEndTime")) {
-      data.workEndTime = scheduleInput.workEndTime ?? null;
+      data.workEndTime =
+        scheduleInput.workEndTime === undefined ? undefined : scheduleInput.workEndTime;
     }
+
     if (Object.prototype.hasOwnProperty.call(dto, "toleranceMinutes")) {
-      data.toleranceMinutes = scheduleInput.toleranceMinutes ?? null;
+      data.toleranceMinutes =
+        scheduleInput.toleranceMinutes === undefined ? undefined : scheduleInput.toleranceMinutes;
     }
+
     if (Object.prototype.hasOwnProperty.call(dto, "timezone")) {
-      data.timezone = scheduleInput.timezone ?? null;
+      data.timezone = scheduleInput.timezone === undefined ? undefined : scheduleInput.timezone;
     }
   }
 }

@@ -72,10 +72,10 @@ export class AdminExportsService {
     });
 
     const schedule: ScheduleSnapshot = {
-      workStartTime: employee.workStartTime,
-      breakStartTime: employee.breakStartTime,
-      breakEndTime: employee.breakEndTime,
-      workEndTime: employee.workEndTime,
+      workStartTime: employee.workStartTime ?? null,
+      breakStartTime: employee.breakStartTime ?? null,
+      breakEndTime: employee.breakEndTime ?? null,
+      workEndTime: employee.workEndTime ?? null,
       toleranceMinutes: employee.toleranceMinutes ?? 5,
     };
 
@@ -98,13 +98,16 @@ export class AdminExportsService {
 
     const rows = events.map((event) => {
       const { date, time } = formatDateTimeParts(event.timestamp, timeZone);
+
       const expectedTime = this.getExpectedTime(event.type, schedule);
+
       const { deltaMinutes, punctuality } = this.calculatePunctuality(
         event.timestamp,
         expectedTime,
         schedule.toleranceMinutes,
         timeZone,
       );
+
       const source = event.punchMethod === "QR" ? "QR" : event.source;
 
       return [
@@ -143,6 +146,7 @@ export class AdminExportsService {
 
     const start = new Date(fromDate);
     start.setHours(0, 0, 0, 0);
+
     const end = new Date(toDate);
     end.setHours(23, 59, 59, 999);
 
