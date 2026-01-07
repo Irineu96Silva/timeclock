@@ -1,32 +1,74 @@
-// apps/api/src/main.ts
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+function buildCors() {
+  // Você pode controlar por env também, mas vou deixar seguro por padrão:
+  const explicitOrigins = (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-  // ✅ CORS (Vercel + Dev local)
-  // IMPORTANT: se você usar cookies/refresh em cookie, mantenha credentials: true
-  app.enableCors({
-    origin: [
-      "https://timeclock-web.vercel.app",
-      "http://localhost:5173",
-      "http://localhost:3000",
-    ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+  // Libera Vercel (preview e produção) e localhost
+  const allowedRegexes: RegExp[] = [
+    /^https:\/\/.*\.vercel\.app$/i, // qualquer projeto no vercel.app
+    /^http:\/\/localhost:\d+$/i,
+  ];
+
+  // Se você tiver domínio próprio depois, adicione aqui:
+  // allowedRegexes.push(/^https:\/\/seu-dominio\.com$/i);
+
+  const allowOrigin = (origin?: string) => {
+    // requests sem Origin (ex: healthcheck, curl) -> permite
+    if (!origin) return true;
+
+    // lista explícita via env (caso você queira travar só em 1 ou 2 origens)
+    if (explicitOrigins.includes(origin)) return true;
+
+    // regex (vercel/localhost)
+    return allowedRegexes.some((re) => re.test(origin));
+  };
+
+  return {
+    origin: (origin: string | undefined, callback: (err: Error | null, ok?: boolean) => void) => {
+      if (allowOrigin(origin)) return callback(null, true);
+      return callback(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
     credentials: true,
-    optionsSuccessStatus: 204,
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "Origin",
+      "X-Requested-With",
+      "Access-Control-Request-Method",
+      "Access-Control-Request-Headers",
+    ],
+    exposedHeaders: ["Content-Disposition"],
+    optionsSuccessStatus: 204, // importante p/ alguns browsers
+    preflightContinue: false,
+    maxAge: 86400,
+  };
+}
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, {
+    // logger: ["log", "error", "warn", "debug", "verbose"],
   });
 
-  // (Opcional) Se você usa proxy (Render/Cloudflare) e quer IP real:
-  // app.set("trust proxy", 1);
+  // Se você estiver atrás de proxy (Render), isso ajuda com algumas situações
+  app.getHttpAdapter().getInstance().set("trust proxy", 1);
 
-  const port = Number(process.env.PORT) || 3000;
-  await app.listen(port);
+  // CORS tem que vir ANTES de listen
+  app.enableCors(buildCors());
 
-  // Se quiser logar a URL:
-  // console.log(`API listening on ${port}`);
+  // Se você usa prefixo:
+  // app.setGlobalPrefix("api");
+
+  const port = Number(process.env.PORT ?? 3000);
+  await app.listen(port, "0.0.0.0");
+
+  console.log(`API listening on ${port}`);
 }
 
 bootstrap();
