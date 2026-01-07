@@ -69,36 +69,18 @@ async function main() {
           tempCompanyId = result[0].id;
         } else {
           // Cria empresa temporária usando SQL raw
-          // Usa apenas campos que sabemos que existem (sem updatedAt que pode não existir)
+          // Usa apenas campos básicos que sempre existem: id, name, createdAt
           const newId = `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           const now = new Date().toISOString();
           
-          // Tenta inserir com updatedAt, se falhar tenta sem
-          try {
-            await prisma.$executeRawUnsafe(
-              `INSERT INTO "Company" (id, name, "createdAt", "updatedAt", "isActive")
-               VALUES (?, ?, ?, ?, ?)`,
-              newId,
-              "__SUPER_ADMIN_TEMP__",
-              now,
-              now,
-              true
-            );
-          } catch (error: any) {
-            // Se falhar, tenta sem updatedAt
-            if (error.message?.includes("updatedAt") || error.message?.includes("no column")) {
-              await prisma.$executeRawUnsafe(
-                `INSERT INTO "Company" (id, name, "createdAt", "isActive")
-                 VALUES (?, ?, ?, ?)`,
-                newId,
-                "__SUPER_ADMIN_TEMP__",
-                now,
-                true
-              );
-            } else {
-              throw error;
-            }
-          }
+          // Insere apenas com campos básicos que sempre existem
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "Company" (id, name, "createdAt")
+             VALUES (?, ?, ?)`,
+            newId,
+            "__SUPER_ADMIN_TEMP__",
+            now
+          );
           
           tempCompanyId = newId;
         }
