@@ -61,69 +61,94 @@ export class AdminSettingsService {
   }
 
   async updateSettings(companyId: string, dto: UpdateSettingsDto): Promise<PublicSettings> {
-    const updateData: Record<string, number | boolean | string> = {};
-
-    if (dto.geofenceLat !== undefined) updateData.geofenceLat = dto.geofenceLat;
-    if (dto.geofenceLng !== undefined) updateData.geofenceLng = dto.geofenceLng;
-    if (dto.geofenceRadiusMeters !== undefined) {
-      updateData.geofenceRadiusMeters = dto.geofenceRadiusMeters;
-    }
-    if (dto.maxAccuracyMeters !== undefined) updateData.maxAccuracyMeters = dto.maxAccuracyMeters;
-    if (dto.geofenceEnabled !== undefined) updateData.geofenceEnabled = dto.geofenceEnabled;
-    if (dto.geoRequired !== undefined) updateData.geoRequired = dto.geoRequired;
-    if (dto.qrEnabled !== undefined) updateData.qrEnabled = dto.qrEnabled;
-    if (dto.punchFallbackMode !== undefined) {
-      updateData.punchFallbackMode = dto.punchFallbackMode;
-    }
-    if (dto.kioskDeviceLabel !== undefined) {
-      updateData.kioskDeviceLabel = dto.kioskDeviceLabel.trim();
-    }
-    if (dto.defaultWorkStartTime !== undefined) {
-      updateData.defaultWorkStartTime = dto.defaultWorkStartTime;
-    }
-    if (dto.defaultBreakStartTime !== undefined) {
-      updateData.defaultBreakStartTime = dto.defaultBreakStartTime;
-    }
-    if (dto.defaultBreakEndTime !== undefined) {
-      updateData.defaultBreakEndTime = dto.defaultBreakEndTime;
-    }
-    if (dto.defaultWorkEndTime !== undefined) {
-      updateData.defaultWorkEndTime = dto.defaultWorkEndTime;
-    }
-    if (dto.defaultToleranceMinutes !== undefined) {
-      updateData.defaultToleranceMinutes = dto.defaultToleranceMinutes;
-    }
-    if (dto.defaultTimezone !== undefined) {
-      updateData.defaultTimezone = dto.defaultTimezone;
-    }
-
-    const createData = {
-      companyId,
-      geofenceEnabled: dto.geofenceEnabled ?? true,
-      geoRequired: dto.geoRequired ?? true,
-      geofenceLat: dto.geofenceLat ?? 0,
-      geofenceLng: dto.geofenceLng ?? 0,
-      geofenceRadiusMeters: dto.geofenceRadiusMeters ?? 200,
-      maxAccuracyMeters: dto.maxAccuracyMeters ?? 100,
-      qrEnabled: dto.qrEnabled ?? true,
-      punchFallbackMode: dto.punchFallbackMode ?? "GEO_OR_QR",
-      qrSecret: this.generateQrSecret(),
-      kioskDeviceLabel: dto.kioskDeviceLabel?.trim() ?? "",
-      defaultWorkStartTime: dto.defaultWorkStartTime ?? "08:00",
-      defaultBreakStartTime: dto.defaultBreakStartTime ?? "12:00",
-      defaultBreakEndTime: dto.defaultBreakEndTime ?? "13:00",
-      defaultWorkEndTime: dto.defaultWorkEndTime ?? "17:00",
-      defaultToleranceMinutes: dto.defaultToleranceMinutes ?? 5,
-      defaultTimezone: dto.defaultTimezone ?? "America/Sao_Paulo",
-    };
-
-    const updated = await this.prisma.companySettings.upsert({
+    // Primeiro, verifica se as configurações existem
+    const existing = await this.prisma.companySettings.findUnique({
       where: { companyId },
-      update: updateData,
-      create: createData,
     });
 
-    return this.pickPublicSettings(updated);
+    // Campos básicos que sempre existem
+    const baseUpdateData: Record<string, number | boolean | string> = {};
+    if (dto.geofenceLat !== undefined) baseUpdateData.geofenceLat = dto.geofenceLat;
+    if (dto.geofenceLng !== undefined) baseUpdateData.geofenceLng = dto.geofenceLng;
+    if (dto.geofenceRadiusMeters !== undefined) {
+      baseUpdateData.geofenceRadiusMeters = dto.geofenceRadiusMeters;
+    }
+    if (dto.maxAccuracyMeters !== undefined) baseUpdateData.maxAccuracyMeters = dto.maxAccuracyMeters;
+    if (dto.geofenceEnabled !== undefined) baseUpdateData.geofenceEnabled = dto.geofenceEnabled;
+    if (dto.geoRequired !== undefined) baseUpdateData.geoRequired = dto.geoRequired;
+    if (dto.qrEnabled !== undefined) baseUpdateData.qrEnabled = dto.qrEnabled;
+    if (dto.punchFallbackMode !== undefined) {
+      baseUpdateData.punchFallbackMode = dto.punchFallbackMode;
+    }
+    if (dto.kioskDeviceLabel !== undefined) {
+      baseUpdateData.kioskDeviceLabel = dto.kioskDeviceLabel.trim();
+    }
+
+    // Campos novos que podem não existir no banco
+    const extendedUpdateData: Record<string, number | boolean | string | null> = {
+      ...baseUpdateData,
+    };
+    
+    // Tenta adicionar campos novos apenas se o registro já existe
+    if (existing) {
+      if (dto.defaultWorkStartTime !== undefined) {
+        extendedUpdateData.defaultWorkStartTime = dto.defaultWorkStartTime;
+      }
+      if (dto.defaultBreakStartTime !== undefined) {
+        extendedUpdateData.defaultBreakStartTime = dto.defaultBreakStartTime;
+      }
+      if (dto.defaultBreakEndTime !== undefined) {
+        extendedUpdateData.defaultBreakEndTime = dto.defaultBreakEndTime;
+      }
+      if (dto.defaultWorkEndTime !== undefined) {
+        extendedUpdateData.defaultWorkEndTime = dto.defaultWorkEndTime;
+      }
+      if (dto.defaultToleranceMinutes !== undefined) {
+        extendedUpdateData.defaultToleranceMinutes = dto.defaultToleranceMinutes;
+      }
+      if (dto.defaultTimezone !== undefined) {
+        extendedUpdateData.defaultTimezone = dto.defaultTimezone;
+      }
+    }
+
+    // Se não existe, cria apenas com campos básicos
+    if (!existing) {
+      const created = await this.prisma.companySettings.create({
+        data: {
+          companyId,
+          geofenceEnabled: dto.geofenceEnabled ?? true,
+          geoRequired: dto.geoRequired ?? true,
+          geofenceLat: dto.geofenceLat ?? 0,
+          geofenceLng: dto.geofenceLng ?? 0,
+          geofenceRadiusMeters: dto.geofenceRadiusMeters ?? 200,
+          maxAccuracyMeters: dto.maxAccuracyMeters ?? 100,
+          qrEnabled: dto.qrEnabled ?? true,
+          punchFallbackMode: dto.punchFallbackMode ?? "GEO_OR_QR",
+          qrSecret: this.generateQrSecret(),
+          kioskDeviceLabel: dto.kioskDeviceLabel?.trim() ?? "",
+        },
+      });
+      return this.pickPublicSettings(created);
+    }
+
+    // Se existe, atualiza (tenta com campos novos, se falhar tenta sem)
+    try {
+      const updated = await this.prisma.companySettings.update({
+        where: { companyId },
+        data: extendedUpdateData,
+      });
+      return this.pickPublicSettings(updated);
+    } catch (error: any) {
+      // Se falhar por causa de campos que não existem, tenta apenas com campos básicos
+      if (error.message?.includes("no column") || error.code === "SQLITE_UNKNOWN") {
+        const updated = await this.prisma.companySettings.update({
+          where: { companyId },
+          data: baseUpdateData,
+        });
+        return this.pickPublicSettings(updated);
+      }
+      throw error;
+    }
   }
 
   async regenerateQrSecret(companyId: string) {

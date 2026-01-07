@@ -33,6 +33,14 @@
         {{ t("employee.home.historyLink") }}
       </router-link>
 
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        @click="showChangePasswordModal = true"
+      >
+        Alterar Senha
+      </button>
+
       <div v-if="isClosed" class="alert alert-warning">
         {{ t("employee.home.closedMessage") }}
       </div>
@@ -100,6 +108,72 @@
   </div>
 
   <QrScannerView v-if="showQrScanner" @scan="handleQrScan" @close="handleCloseScanner" />
+
+  <!-- Modal de Alteração de Senha -->
+  <div v-if="showChangePasswordModal" class="modal-backdrop" @click.self="showChangePasswordModal = false">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Alterar Senha</h3>
+        <p class="muted">Digite sua senha atual e a nova senha</p>
+      </div>
+      <div class="modal-body">
+        <form @submit.prevent="handleChangePassword" class="form">
+          <label class="field">
+            <span class="label">Senha Atual</span>
+            <input
+              v-model="passwordForm.currentPassword"
+              class="input"
+              type="password"
+              required
+              :disabled="changingPassword"
+            />
+          </label>
+          <label class="field">
+            <span class="label">Nova Senha</span>
+            <input
+              v-model="passwordForm.newPassword"
+              class="input"
+              type="password"
+              required
+              minlength="6"
+              :disabled="changingPassword"
+            />
+            <p class="muted">Mínimo de 6 caracteres</p>
+          </label>
+          <label class="field">
+            <span class="label">Confirmar Nova Senha</span>
+            <input
+              v-model="passwordForm.confirmPassword"
+              class="input"
+              type="password"
+              required
+              :disabled="changingPassword"
+            />
+          </label>
+          <div v-if="passwordError" class="alert alert-error">{{ passwordError }}</div>
+          <div v-if="passwordSuccess" class="alert alert-success">{{ passwordSuccess }}</div>
+        </form>
+      </div>
+      <div class="modal-actions">
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="changingPassword || !isPasswordFormValid"
+          @click="handleChangePassword"
+        >
+          {{ changingPassword ? "Alterando..." : "Alterar Senha" }}
+        </button>
+        <button
+          class="btn btn-ghost"
+          type="button"
+          :disabled="changingPassword"
+          @click="closePasswordModal"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -135,6 +209,15 @@ const showQrFallback = ref(false);
 const showQrScanner = ref(false);
 const qrSubmitting = ref(false);
 const qrFallbackError = ref("");
+const showChangePasswordModal = ref(false);
+const changingPassword = ref(false);
+const passwordError = ref("");
+const passwordSuccess = ref("");
+const passwordForm = ref({
+  currentPassword: "",
+  newPassword: "",
+  confirmPassword: "",
+});
 
 const statusLabel = computed(() => {
   if (!status.value.currentType) {
@@ -343,6 +426,58 @@ const handleQrScan = async (token: string) => {
   } finally {
     qrSubmitting.value = false;
   }
+};
+
+const isPasswordFormValid = computed(() => {
+  return (
+    passwordForm.value.currentPassword &&
+    passwordForm.value.newPassword &&
+    passwordForm.value.confirmPassword &&
+    passwordForm.value.newPassword.length >= 6 &&
+    passwordForm.value.newPassword === passwordForm.value.confirmPassword
+  );
+});
+
+const handleChangePassword = async () => {
+  if (!isPasswordFormValid.value) {
+    passwordError.value = "Preencha todos os campos corretamente";
+    return;
+  }
+
+  if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
+    passwordError.value = "As senhas não coincidem";
+    return;
+  }
+
+  changingPassword.value = true;
+  passwordError.value = "";
+  passwordSuccess.value = "";
+
+  try {
+    await api.post("/auth/change-password", {
+      currentPassword: passwordForm.value.currentPassword,
+      newPassword: passwordForm.value.newPassword,
+    });
+    passwordSuccess.value = "Senha alterada com sucesso!";
+    setTimeout(() => {
+      closePasswordModal();
+    }, 2000);
+  } catch (err) {
+    passwordError.value = getErrorMessage(err);
+  } finally {
+    changingPassword.value = false;
+  }
+};
+
+const closePasswordModal = () => {
+  showChangePasswordModal.value = false;
+  passwordForm.value = {
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  };
+  passwordError.value = "";
+  passwordSuccess.value = "";
 };
 
 onMounted(loadToday);

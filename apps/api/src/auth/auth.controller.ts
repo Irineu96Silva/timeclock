@@ -3,6 +3,7 @@ import { Throttle } from "@nestjs/throttler";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshDto } from "./dto/refresh.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { AuthService } from "./auth.service";
 import { AuthenticatedUser } from "./auth.types";
@@ -38,5 +39,15 @@ export class AuthController {
       role: user.role,
       companyId: user.companyId,
     };
+  }
+
+  @Post("change-password")
+  @UseGuards(JwtAuthGuard)
+  async changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    await this.authService.changePassword(user.id, dto);
+    return { success: true, message: "Senha alterada com sucesso" };
   }
 }

@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import { PrismaService } from "../prisma/prisma.service";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshDto } from "./dto/refresh.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
 import { AuthTokens, JwtPayload, normalizeRole } from "./auth.types";
 
 @Injectable()
@@ -90,6 +91,27 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: userId },
       data: { refreshTokenHash: null },
+    });
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException("Usuário não encontrado");
+    }
+
+    const currentPasswordValid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!currentPasswordValid) {
+      throw new UnauthorizedException("Senha atual incorreta");
+    }
+
+    const newPasswordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newPasswordHash },
     });
   }
 
