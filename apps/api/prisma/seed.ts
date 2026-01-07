@@ -31,35 +31,53 @@ async function main() {
   
   const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
   
-  // Verificar se super admin já existe
+  // Verificar se super admin já existe (busca por email e role, sem companyId)
   const existingSuperAdmin = await prisma.user.findFirst({
     where: {
       email: superAdminEmail,
       role: "SUPER_ADMIN",
-      companyId: null,
     },
   });
 
-  const superAdmin = existingSuperAdmin
-    ? await prisma.user.update({
+  let superAdmin;
+  if (existingSuperAdmin) {
+    // Se existe mas tem companyId, atualiza para null
+    if (existingSuperAdmin.companyId !== null) {
+      superAdmin = await prisma.user.update({
+        where: { id: existingSuperAdmin.id },
+        data: {
+          companyId: null,
+          passwordHash: superAdminPasswordHash,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        },
+      });
+    } else {
+      // Se já existe e está correto, apenas atualiza a senha
+      superAdmin = await prisma.user.update({
         where: { id: existingSuperAdmin.id },
         data: {
           passwordHash: superAdminPasswordHash,
           role: "SUPER_ADMIN",
           isActive: true,
         },
-      })
-    : await prisma.user.create({
-        data: {
-          companyId: null,
-          email: superAdminEmail,
-          passwordHash: superAdminPasswordHash,
-          role: "SUPER_ADMIN",
-          isActive: true,
-        },
       });
+    }
+  } else {
+    // Cria novo super admin sem companyId
+    // Não passamos companyId no data, deixando como undefined (será null no banco)
+    superAdmin = await prisma.user.create({
+      data: {
+        email: superAdminEmail,
+        passwordHash: superAdminPasswordHash,
+        role: "SUPER_ADMIN",
+        isActive: true,
+        // companyId não é passado, então será null por padrão
+      },
+    });
+  }
 
-  console.log("Super Admin criado:");
+  console.log("Super Admin criado/atualizado:");
   console.log(`Email: ${superAdminEmail}`);
   console.log(`Senha: ${superAdminPassword}`);
 
