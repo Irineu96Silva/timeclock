@@ -7,7 +7,7 @@ export type JwtPayload = {
   sub: string;
   email: string;
   role: UserRole;
-  companyId?: string | null; // Opcional para SUPER_ADMIN, null quando super admin
+  companyId?: string; // Opcional para SUPER_ADMIN
 };
 
 export type AuthTokens = {
@@ -19,13 +19,7 @@ export type AuthenticatedUser = {
   id: string;
   email: string;
   role: UserRole;
-  companyId?: string | null; // Opcional para SUPER_ADMIN, null quando super admin
-};
-
-// Types para roles específicas que SEMPRE têm companyId
-export type AuthenticatedAdminUser = AuthenticatedUser & {
-  role: "ADMIN" | "EMPLOYEE" | "KIOSK";
-  companyId: string; // Obrigatório para essas roles
+  companyId?: string; // Opcional para SUPER_ADMIN
 };
 
 export function normalizeRole(role: string): UserRole {
