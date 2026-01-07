@@ -9,9 +9,9 @@ export class KioskService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getTodayQr(user: AuthenticatedUser) {
-    const settings = await this.getCompanySettings(user.companyId);
+    const settings = await this.getCompanySettings(user.companyId!);
     const date = this.formatDate(new Date());
-    const qrToken = buildQrPayload(user.companyId, date, settings.qrSecret);
+    const qrToken = buildQrPayload(user.companyId!, date, settings.qrSecret);
     const expiresAt = this.getNextDayStart(new Date()).toISOString();
 
     return { date, qrToken, expiresAt, deviceLabel: settings.kioskDeviceLabel };

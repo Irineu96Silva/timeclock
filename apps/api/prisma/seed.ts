@@ -65,14 +65,14 @@ async function main() {
     }
   } else {
     // Cria novo super admin sem companyId
-    // Não passamos companyId no data, deixando como undefined (será null no banco)
+    // Passamos companyId: null explicitamente para o SUPER_ADMIN
     superAdmin = await prisma.user.create({
       data: {
         email: superAdminEmail,
         passwordHash: superAdminPasswordHash,
         role: "SUPER_ADMIN",
         isActive: true,
-        // companyId não é passado, então será null por padrão
+        companyId: null,
       },
     });
   }

@@ -42,7 +42,7 @@ export class KioskAuthService {
 
     const employees = await this.prisma.employeeProfile.findMany({
       where: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         isActive: true,
         pinHash: { not: null },
         user: { isActive: true },
@@ -109,7 +109,7 @@ export class KioskAuthService {
 
     await this.prisma.auditLog.create({
       data: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         userId: user.id,
         action: "KIOSK_AUTH_SUCCESS",
         entity: "EmployeeProfile",
@@ -122,7 +122,7 @@ export class KioskAuthService {
       },
     });
 
-    const suggestion = await this.getSuggestion(user.companyId, matched.id);
+    const suggestion = await this.getSuggestion(user.companyId!, matched.id);
     return {
       employeeId: matched.id,
       fullName: matched.fullName,
@@ -142,7 +142,7 @@ export class KioskAuthService {
       });
     }
 
-    const settings = await this.getCompanySettings(user.companyId);
+    const settings = await this.getCompanySettings(user.companyId!);
 
     let parsed: { companyId: string; employeeId: string };
     try {
@@ -155,7 +155,7 @@ export class KioskAuthService {
       });
     }
 
-    if (parsed.companyId !== user.companyId) {
+    if (parsed.companyId !== user.companyId!) {
       await this.logAuthFailed(user, "EMPLOYEE_QR", "INVALID_EMPLOYEE_QR", undefined, deviceLabel);
       throw new ForbiddenException({
         code: "INVALID_EMPLOYEE_QR",
@@ -166,7 +166,7 @@ export class KioskAuthService {
     const employee = await this.prisma.employeeProfile.findFirst({
       where: {
         id: parsed.employeeId,
-        companyId: user.companyId,
+        companyId: user.companyId!,
         isActive: true,
         user: { isActive: true },
       },
@@ -186,7 +186,7 @@ export class KioskAuthService {
 
     await this.prisma.auditLog.create({
       data: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         userId: user.id,
         action: "KIOSK_AUTH_SUCCESS",
         entity: "EmployeeProfile",
@@ -199,7 +199,7 @@ export class KioskAuthService {
       },
     });
 
-    const suggestion = await this.getSuggestion(user.companyId, employee.id);
+    const suggestion = await this.getSuggestion(user.companyId!, employee.id);
     return {
       employeeId: employee.id,
       fullName: employee.fullName,
@@ -217,7 +217,7 @@ export class KioskAuthService {
   ) {
     await this.prisma.auditLog.create({
       data: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         userId: user.id,
         action: "KIOSK_AUTH_FAILED",
         entity: "EmployeeProfile",
@@ -234,7 +234,7 @@ export class KioskAuthService {
 
   private getDeviceKey(user: AuthenticatedUser, deviceLabel?: string | null) {
     const label = deviceLabel?.trim();
-    return `${user.companyId}:${user.id}:${label || "UNKNOWN"}`;
+    return `${user.companyId!}:${user.id}:${label || "UNKNOWN"}`;
   }
 
   private getDeviceState(key: string) {

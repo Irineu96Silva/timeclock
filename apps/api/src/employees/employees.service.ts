@@ -69,7 +69,7 @@ export class EmployeesService {
       const { user, employee } = await this.prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
-            companyId: admin.companyId,
+            companyId: admin.companyId!,
             email,
             passwordHash,
             role: "EMPLOYEE",
@@ -79,7 +79,7 @@ export class EmployeesService {
 
         const employee = await tx.employeeProfile.create({
           data: {
-            company: { connect: { id: admin.companyId } },
+            company: { connect: { id: admin.companyId! } },
             user: { connect: { id: user.id } },
             fullName,
             document: dto.document?.trim() || null,
@@ -95,7 +95,7 @@ export class EmployeesService {
 
         await tx.auditLog.create({
           data: {
-            companyId: admin.companyId,
+            companyId: admin.companyId!,
             userId: admin.id,
             action: "EMPLOYEE_CREATED",
             entity: "EmployeeProfile",
@@ -123,7 +123,7 @@ export class EmployeesService {
 
   async findAll(admin: AuthenticatedUser): Promise<EmployeeListItem[]> {
     const rows = await this.prisma.employeeProfile.findMany({
-      where: { companyId: admin.companyId },
+      where: { companyId: admin.companyId! },
       select: {
         id: true,
         fullName: true,
@@ -152,7 +152,7 @@ export class EmployeesService {
 
   async update(id: string, dto: UpdateEmployeeDto, admin: AuthenticatedUser) {
     const employee = await this.prisma.employeeProfile.findFirst({
-      where: { id, companyId: admin.companyId },
+      where: { id, companyId: admin.companyId! },
     });
 
     if (!employee) {
@@ -189,7 +189,7 @@ export class EmployeesService {
 
     await this.prisma.auditLog.create({
       data: {
-        companyId: admin.companyId,
+        companyId: admin.companyId!,
         userId: admin.id,
         action: "EMPLOYEE_UPDATED",
         entity: "EmployeeProfile",
@@ -202,7 +202,7 @@ export class EmployeesService {
 
   async resetPassword(id: string, admin: AuthenticatedUser) {
     const employee = await this.prisma.employeeProfile.findFirst({
-      where: { id, companyId: admin.companyId },
+      where: { id, companyId: admin.companyId! },
       include: { user: true },
     });
 
@@ -221,7 +221,7 @@ export class EmployeesService {
 
       await tx.auditLog.create({
         data: {
-          companyId: admin.companyId,
+          companyId: admin.companyId!,
           userId: admin.id,
           action: "EMPLOYEE_PASSWORD_RESET",
           entity: "EmployeeProfile",
@@ -235,7 +235,7 @@ export class EmployeesService {
 
   async setPin(id: string, dto: SetEmployeePinDto, admin: AuthenticatedUser) {
     const employee = await this.prisma.employeeProfile.findFirst({
-      where: { id, companyId: admin.companyId },
+      where: { id, companyId: admin.companyId! },
     });
 
     if (!employee) {
@@ -256,7 +256,7 @@ export class EmployeesService {
 
     await this.prisma.auditLog.create({
       data: {
-        companyId: admin.companyId,
+        companyId: admin.companyId!,
         userId: admin.id,
         action: "ADMIN_SET_PIN",
         entity: "EmployeeProfile",
@@ -269,7 +269,7 @@ export class EmployeesService {
 
   async resetPin(id: string, admin: AuthenticatedUser) {
     const employee = await this.prisma.employeeProfile.findFirst({
-      where: { id, companyId: admin.companyId },
+      where: { id, companyId: admin.companyId! },
     });
 
     if (!employee) {
@@ -291,7 +291,7 @@ export class EmployeesService {
 
     await this.prisma.auditLog.create({
       data: {
-        companyId: admin.companyId,
+        companyId: admin.companyId!,
         userId: admin.id,
         action: "ADMIN_RESET_PIN",
         entity: "EmployeeProfile",
@@ -304,19 +304,19 @@ export class EmployeesService {
 
   async regenerateEmployeeQr(id: string, admin: AuthenticatedUser) {
     const employee = await this.prisma.employeeProfile.findFirst({
-      where: { id, companyId: admin.companyId },
+      where: { id, companyId: admin.companyId! },
     });
 
     if (!employee) {
       throw new NotFoundException("Employee not found");
     }
 
-    const settings = await this.getCompanySettings(admin.companyId);
-    const token = buildEmployeeQrToken(admin.companyId, employee.id, settings.qrSecret);
+    const settings = await this.getCompanySettings(admin.companyId!);
+    const token = buildEmployeeQrToken(admin.companyId!, employee.id, settings.qrSecret);
 
     await this.prisma.auditLog.create({
       data: {
-        companyId: admin.companyId,
+        companyId: admin.companyId!,
         userId: admin.id,
         action: "EMPLOYEE_QR_REGENERATED",
         entity: "EmployeeProfile",

@@ -22,7 +22,7 @@ export class AdminKioskService {
     try {
       const user = await this.prisma.user.create({
         data: {
-          companyId: admin.companyId,
+          companyId: admin.companyId!,
           email,
           passwordHash,
           role: "KIOSK",
@@ -32,7 +32,7 @@ export class AdminKioskService {
 
       await this.prisma.auditLog.create({
         data: {
-          companyId: admin.companyId,
+          companyId: admin.companyId!,
           userId: admin.id,
           action: "KIOSK_USER_CREATED",
           entity: "User",

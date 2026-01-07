@@ -89,7 +89,7 @@ export class TimeClockService {
     metadata?: { ip?: string; userAgent?: string },
   ) {
     const employee = await this.getEmployeeProfile(user);
-    const settings = await this.getCompanySettings(user.companyId);
+    const settings = await this.getCompanySettings(user.companyId!);
     const geoInput = dto.geo
       ? {
           lat: dto.geo.lat,
@@ -106,7 +106,7 @@ export class TimeClockService {
 
     const lastEvent = await this.prisma.timeClockEvent.findFirst({
       where: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         employeeId: employee.id,
         timestamp: {
           gte: start,
@@ -122,7 +122,7 @@ export class TimeClockService {
     const event = await this.prisma.$transaction(async (tx) => {
       const created = await tx.timeClockEvent.create({
         data: {
-          companyId: user.companyId,
+          companyId: user.companyId!,
           employeeId: employee.id,
           type: nextType,
           timestamp,
@@ -144,7 +144,7 @@ export class TimeClockService {
 
       await tx.auditLog.create({
         data: {
-          companyId: user.companyId,
+          companyId: user.companyId!,
           userId: user.id,
           action: "TIMECLOCK_PUNCH",
           entity: "TimeClockEvent",
@@ -169,7 +169,7 @@ export class TimeClockService {
 
     const events = await this.prisma.timeClockEvent.findMany({
       where: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         employeeId: employee.id,
         timestamp: {
           gte: start,
@@ -201,7 +201,7 @@ export class TimeClockService {
 
     return this.prisma.timeClockEvent.findMany({
       where: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         employeeId: employee.id,
         timestamp: {
           gte: from,
@@ -335,7 +335,7 @@ export class TimeClockService {
       throw new Error("INVALID_QR: parse falhou.");
     }
 
-    if (parsed.companyId !== user.companyId) {
+    if (parsed.companyId !== user.companyId!) {
       await this.throwBlockedAttempt(user, metadata, {
         code: "INVALID_QR",
         message: QR_BLOCK_MESSAGES.INVALID_QR,
@@ -372,7 +372,7 @@ export class TimeClockService {
   ): Promise<never> {
     await this.prisma.auditLog.create({
       data: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         userId: user.id,
         action: "TIMECLOCK_PUNCH_BLOCKED",
         entity: "TimeClockEvent",
@@ -423,7 +423,7 @@ export class TimeClockService {
   private async getEmployeeProfile(user: AuthenticatedUser) {
     const employee = await this.prisma.employeeProfile.findFirst({
       where: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         userId: user.id,
         isActive: true,
       },

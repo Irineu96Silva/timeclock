@@ -15,7 +15,7 @@ export class KioskPunchService {
     const employee = await this.prisma.employeeProfile.findFirst({
       where: {
         id: dto.employeeId,
-        companyId: user.companyId,
+        companyId: user.companyId!,
         isActive: true,
         user: { isActive: true },
       },
@@ -33,7 +33,7 @@ export class KioskPunchService {
     const { start, end } = this.getDayRange();
     const lastEvent = await this.prisma.timeClockEvent.findFirst({
       where: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         employeeId: employee.id,
         timestamp: {
           gte: start,
@@ -50,7 +50,7 @@ export class KioskPunchService {
     const event = await this.prisma.$transaction(async (tx) => {
       const created = await tx.timeClockEvent.create({
         data: {
-          companyId: user.companyId,
+          companyId: user.companyId!,
           employeeId: employee.id,
           type: nextType,
           timestamp,
@@ -67,7 +67,7 @@ export class KioskPunchService {
 
       await tx.auditLog.create({
         data: {
-          companyId: user.companyId,
+          companyId: user.companyId!,
           userId: user.id,
           action: "KIOSK_PUNCH",
           entity: "TimeClockEvent",
@@ -103,7 +103,7 @@ export class KioskPunchService {
   ) {
     await this.prisma.auditLog.create({
       data: {
-        companyId: user.companyId,
+        companyId: user.companyId!,
         userId: user.id,
         action: "KIOSK_PUNCH_BLOCKED",
         entity: "EmployeeProfile",

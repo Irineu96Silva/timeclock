@@ -32,9 +32,9 @@ export class AdminDashboardService {
     const referenceDate = this.parseReferenceDate(query.date);
     const { start, end } = this.getDayRange(referenceDate);
 
-    const employees = await this.getActiveEmployees(user.companyId);
+    const employees = await this.getActiveEmployees(user.companyId!);
     const lastEvents = await this.getLastEvents(
-      user.companyId,
+      user.companyId!,
       employees.map((employee) => employee.id),
       start,
       end,
@@ -68,7 +68,7 @@ export class AdminDashboardService {
     }
 
     const blockedAttemptsToday = await this.getBlockedAttemptsTotal(
-      user.companyId,
+      user.companyId!,
       start,
       end,
     );
@@ -86,16 +86,16 @@ export class AdminDashboardService {
     const referenceDate = this.parseReferenceDate(query.date);
     const { start, end } = this.getDayRange(referenceDate);
 
-    const employees = await this.getActiveEmployees(user.companyId);
+    const employees = await this.getActiveEmployees(user.companyId!);
     const lastEvents = await this.getLastEvents(
-      user.companyId,
+      user.companyId!,
       employees.map((employee) => employee.id),
       start,
       end,
     );
 
     const blockedCounts = await this.getBlockedAttemptsByUser(
-      user.companyId,
+      user.companyId!,
       employees.map((employee) => employee.userId),
       start,
       end,
