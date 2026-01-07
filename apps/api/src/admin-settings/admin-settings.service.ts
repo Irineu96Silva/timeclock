@@ -254,12 +254,14 @@ export class AdminSettingsService {
     }
 
     // Campos novos que podem não existir no banco
+    // Só adiciona se o existing tiver esses campos (ou seja, se foram buscados com sucesso)
     const extendedUpdateData: Record<string, number | boolean | string | null> = {
       ...baseUpdateData,
     };
     
-    // Tenta adicionar campos novos apenas se o registro já existe
-    if (existing) {
+    // Tenta adicionar campos novos apenas se o registro já existe E se os campos foram buscados
+    // Se existing não tem esses campos, significa que não existem no banco
+    if (existing && 'defaultWorkStartTime' in existing) {
       if (dto.defaultWorkStartTime !== undefined) {
         extendedUpdateData.defaultWorkStartTime = dto.defaultWorkStartTime;
       }
