@@ -160,6 +160,30 @@ async function requestBlob(path: string, options: RequestInit = {}): Promise<Blo
   return response.blob();
 }
 
+async function requestBlobPost(path: string, body?: unknown): Promise<Blob> {
+  const headers = new Headers();
+  headers.set("Content-Type", "application/json");
+
+  const token = getAccessToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+    credentials: "include",
+    mode: "cors",
+  });
+
+  if (!response.ok) {
+    throw new ApiError(response.statusText, response.status);
+  }
+
+  return response.blob();
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
@@ -167,4 +191,5 @@ export const api = {
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, body ? { method: "PATCH", body: JSON.stringify(body) } : { method: "PATCH" }),
   getBlob: (path: string) => requestBlob(path),
+  postBlob: (path: string, body?: unknown) => requestBlobPost(path, body),
 };

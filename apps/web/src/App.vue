@@ -10,7 +10,12 @@
       </button>
     </header>
     <main :class="['app-main', isKioskRoute ? 'app-main--kiosk' : '']">
-      <nav v-if="isAdminRoute" class="admin-nav">
+      <nav v-if="isSuperAdminRoute" class="admin-nav">
+        <router-link class="admin-nav__link" to="/super-admin/companies">
+          Empresas
+        </router-link>
+      </nav>
+      <nav v-else-if="isAdminRoute" class="admin-nav">
         <router-link class="admin-nav__link" to="/admin/dashboard">
           {{ t("admin.menu.dashboard") }}
         </router-link>
@@ -33,7 +38,7 @@
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { t } from "./i18n";
-import { api, clearAccessToken, getAccessToken } from "./services/api";
+import { api, clearAccessToken, getAccessToken, getUserRole } from "./services/api";
 
 const router = useRouter();
 const route = useRoute();
@@ -43,11 +48,16 @@ const hasToken = computed(() => {
   return Boolean(getAccessToken());
 });
 
+const userRole = computed(() => getUserRole()?.toUpperCase());
+const isSuperAdminRoute = computed(() => route.path.startsWith("/super-admin"));
 const isAdminRoute = computed(() => route.path.startsWith("/admin"));
 const isKioskRoute = computed(() => route.path.startsWith("/kiosk"));
 
 const headerTitle = computed(() => {
   const path = route.path;
+  if (path.startsWith("/super-admin")) {
+    return "Super Admin";
+  }
   if (path.startsWith("/employee")) {
     return t("app.header.employee");
   }

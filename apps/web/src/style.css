@@ -1,25 +1,31 @@
 :root {
   color-scheme: light;
-  --color-bg: #f5f6f8;
+  --color-bg: #f8fafc;
   --color-surface: #ffffff;
-  --color-primary: #1f4e8c;
-  --color-primary-600: #1b437a;
-  --color-primary-100: #e7eff9;
-  --color-text: #1f2937;
-  --color-muted: #5f6b7a;
+  --color-primary: #2563eb;
+  --color-primary-600: #1d4ed8;
+  --color-primary-100: #dbeafe;
+  --color-secondary: #64748b;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
   --color-border: #e2e8f0;
-  --color-success: #2f855a;
-  --color-warning: #b7791f;
-  --color-danger: #b42318;
-  --color-info: #2b6cb0;
-  --radius: 14px;
-  --radius-lg: 18px;
-  --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.08);
-  --shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  line-height: 1.5;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.6;
   font-weight: 400;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 * {
@@ -57,6 +63,11 @@ a {
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .app-brand {
@@ -74,7 +85,11 @@ a {
 
 .title {
   font-size: clamp(1.5rem, 2.6vw, 2.3rem);
-  font-weight: 600;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-600) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .app-main {
@@ -98,18 +113,28 @@ a {
 }
 
 .admin-nav__link {
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.2rem;
   border-radius: 999px;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   font-weight: 600;
   font-size: 0.9rem;
-  color: var(--color-primary-600);
+  color: var(--color-muted);
+  transition: var(--transition);
+}
+
+.admin-nav__link:hover {
+  background: var(--color-primary-100);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
 }
 
 .admin-nav__link.router-link-active {
-  background: var(--color-primary-100);
-  border-color: var(--color-primary-600);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
 }
 
 .page-grid {
@@ -127,8 +152,13 @@ a {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: 1.5rem;
+  padding: 2rem;
   box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.card:hover {
+  box-shadow: var(--shadow);
 }
 
 .card-header {
@@ -185,22 +215,28 @@ a {
 }
 
 .input {
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
-  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--color-border);
+  padding: 0.75rem 1rem;
   font-size: 1rem;
   background: var(--color-surface);
   color: var(--color-text);
+  transition: var(--transition);
+}
+
+.input:hover {
+  border-color: var(--color-primary);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
 }
 
 .input--sm {
   padding: 0.5rem 0.7rem;
   font-size: 0.85rem;
-}
-
-.input:focus {
-  outline: 2px solid var(--color-primary-100);
-  border-color: var(--color-primary);
 }
 
 input[type="checkbox"] {
@@ -213,32 +249,55 @@ input[type="checkbox"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   border: 1px solid transparent;
-  border-radius: 999px;
-  padding: 0.75rem 1.4rem;
+  border-radius: var(--radius);
+  padding: 0.75rem 1.5rem;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: var(--transition);
   background: var(--color-primary-100);
-  color: var(--color-primary-600);
+  color: var(--color-primary);
 }
 
-.btn:hover {
-  transform: translateY(-1px);
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btn:disabled {
   cursor: not-allowed;
-  opacity: 0.7;
+  opacity: 0.6;
   transform: none;
 }
 
 .btn-primary {
-  background: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-600) 100%);
   color: #ffffff;
   box-shadow: var(--shadow-sm);
+  border: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow: var(--shadow);
+  filter: brightness(1.05);
+}
+
+.btn-secondary {
+  background: var(--color-secondary);
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+  border: none;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  box-shadow: var(--shadow);
+  filter: brightness(1.1);
 }
 
 .btn-ghost {
@@ -356,13 +415,37 @@ input[type="checkbox"] {
 }
 
 .stat-card {
-  padding: 1rem;
-  border-radius: var(--radius);
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-  background: #fbfcfd;
+  background: var(--color-surface);
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.5rem;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-primary-600));
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
 }
 
 .stat-label {
@@ -787,6 +870,51 @@ input[type="checkbox"] {
   flex-wrap: wrap;
   gap: 0.8rem;
   margin-top: 1.4rem;
+}
+
+.table-container {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+}
+
+.table thead {
+  background: var(--color-primary-100);
+}
+
+.table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-primary);
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.table tbody tr {
+  transition: var(--transition);
+}
+
+.table tbody tr:hover {
+  background: var(--color-primary-100);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 @media (max-width: 720px) {

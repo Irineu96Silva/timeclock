@@ -80,6 +80,57 @@
         </div>
 
         <div class="section">
+          <h3 class="section-title">Jornada de Trabalho Padrão</h3>
+          <p class="section-subtitle">
+            Configure a jornada padrão que será aplicada aos novos funcionários
+          </p>
+
+          <div class="form-row">
+            <label class="field">
+              <span class="label">Entrada</span>
+              <input v-model="form.defaultWorkStartTime" class="input" type="time" />
+            </label>
+            <label class="field">
+              <span class="label">Saída</span>
+              <input v-model="form.defaultWorkEndTime" class="input" type="time" />
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="field">
+              <span class="label">Início do Almoço</span>
+              <input v-model="form.defaultBreakStartTime" class="input" type="time" />
+            </label>
+            <label class="field">
+              <span class="label">Fim do Almoço</span>
+              <input v-model="form.defaultBreakEndTime" class="input" type="time" />
+            </label>
+          </div>
+
+          <div class="form-row">
+            <label class="field">
+              <span class="label">Tolerância (minutos)</span>
+              <input
+                v-model.number="form.defaultToleranceMinutes"
+                class="input"
+                type="number"
+                min="0"
+              />
+            </label>
+            <label class="field">
+              <span class="label">Fuso Horário</span>
+              <select v-model="form.defaultTimezone" class="input">
+                <option value="America/Sao_Paulo">America/Sao_Paulo (Brasil)</option>
+                <option value="America/Manaus">America/Manaus (Amazonas)</option>
+                <option value="America/Fortaleza">America/Fortaleza (Nordeste)</option>
+                <option value="America/Campo_Grande">America/Campo_Grande (Mato Grosso)</option>
+                <option value="America/Acre">America/Acre (Acre)</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="section">
           <h3 class="section-title">{{ t("admin.settings.kioskSection.title") }}</h3>
           <p class="section-subtitle">{{ t("admin.settings.kioskSection.subtitle") }}</p>
 
@@ -183,6 +234,12 @@ type SettingsResponse = {
   qrEnabled: boolean;
   punchFallbackMode: "GEO_ONLY" | "GEO_OR_QR" | "QR_ONLY";
   kioskDeviceLabel: string;
+  defaultWorkStartTime: string | null;
+  defaultBreakStartTime: string | null;
+  defaultBreakEndTime: string | null;
+  defaultWorkEndTime: string | null;
+  defaultToleranceMinutes: number | null;
+  defaultTimezone: string | null;
 };
 
 const form = reactive<SettingsResponse>({
@@ -195,6 +252,12 @@ const form = reactive<SettingsResponse>({
   qrEnabled: true,
   punchFallbackMode: "GEO_OR_QR",
   kioskDeviceLabel: "",
+  defaultWorkStartTime: "08:00",
+  defaultBreakStartTime: "12:00",
+  defaultBreakEndTime: "13:00",
+  defaultWorkEndTime: "17:00",
+  defaultToleranceMinutes: 5,
+  defaultTimezone: "America/Sao_Paulo",
 });
 
 const loading = ref(true);
@@ -236,6 +299,12 @@ const handleSave = async () => {
       qrEnabled: form.qrEnabled,
       punchFallbackMode: form.punchFallbackMode,
       kioskDeviceLabel: form.kioskDeviceLabel.trim(),
+      defaultWorkStartTime: form.defaultWorkStartTime,
+      defaultBreakStartTime: form.defaultBreakStartTime,
+      defaultBreakEndTime: form.defaultBreakEndTime,
+      defaultWorkEndTime: form.defaultWorkEndTime,
+      defaultToleranceMinutes: form.defaultToleranceMinutes,
+      defaultTimezone: form.defaultTimezone,
     });
     Object.assign(form, data);
     success.value = t("admin.settings.saved");

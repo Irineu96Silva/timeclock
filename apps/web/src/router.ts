@@ -27,6 +27,11 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/super-admin/companies",
+    component: () => import("./pages/SuperAdminCompaniesView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/employee/home",
     component: () => import("./pages/EmployeeHomeView.vue"),
     meta: { requiresAuth: true },
@@ -68,6 +73,9 @@ router.beforeEach((to) => {
   }
   if (to.path === "/login" && token) {
     const role = getUserRole()?.toUpperCase();
+    if (role === "SUPER_ADMIN") {
+      return "/super-admin/companies";
+    }
     if (role === "EMPLOYEE") {
       return "/employee/home";
     }
@@ -77,16 +85,20 @@ router.beforeEach((to) => {
     return "/admin/dashboard";
   }
   const role = getUserRole()?.toUpperCase();
-  if (role === "KIOSK") {
+  if (role === "SUPER_ADMIN") {
+    if (!to.path.startsWith("/super-admin")) {
+      return "/super-admin/companies";
+    }
+  } else if (role === "KIOSK") {
     if (!to.path.startsWith("/kiosk")) {
       return "/kiosk";
     }
   } else if (role === "EMPLOYEE") {
-    if (to.path.startsWith("/admin") || to.path.startsWith("/kiosk")) {
+    if (to.path.startsWith("/admin") || to.path.startsWith("/kiosk") || to.path.startsWith("/super-admin")) {
       return "/employee/home";
     }
   } else if (role === "ADMIN") {
-    if (to.path.startsWith("/employee") || to.path.startsWith("/kiosk")) {
+    if (to.path.startsWith("/employee") || to.path.startsWith("/kiosk") || to.path.startsWith("/super-admin")) {
       return "/admin/dashboard";
     }
   }
