@@ -56,23 +56,58 @@ async function main() {
       },
     });
   } else {
-    // Não existe, cria novo usando SQL raw para garantir que companyId seja NULL
-    // Isso evita problemas com o Prisma Client e Turso
+    // Não existe, cria novo usando SQL raw com sintaxe que força NULL
+    // Usa Prisma.$executeRawUnsafe para ter mais controle
     const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
     
-    await prisma.$executeRaw`
-      INSERT INTO "User" (id, "companyId", email, "passwordHash", role, "isActive", "createdAt", "updatedAt")
-      VALUES (${userId}, NULL, ${superAdminEmail}, ${superAdminPasswordHash}, ${"SUPER_ADMIN"}, ${true}, ${now}, ${now})
-    `;
-    
-    // Busca o usuário criado
-    superAdmin = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-    
-    if (!superAdmin) {
-      throw new Error("Falha ao criar SUPER_ADMIN via SQL raw");
+    try {
+      // Tenta inserir sem especificar companyId (deve ser NULL por padrão)
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "User" (id, email, "passwordHash", role, "isActive", "createdAt", "updatedAt")
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        userId,
+        superAdminEmail,
+        superAdminPasswordHash,
+        "SUPER_ADMIN",
+        true,
+        now,
+        now
+      );
+      
+      // Busca o usuário criado
+      superAdmin = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+      
+      if (!superAdmin) {
+        throw new Error("Falha ao criar SUPER_ADMIN via SQL raw");
+      }
+    } catch (error: any) {
+      // Se ainda falhar, tenta com NULL explícito
+      if (error.message?.includes("NOT NULL") || error.code === "SQLITE_CONSTRAINT") {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "User" (id, "companyId", email, "passwordHash", role, "isActive", "createdAt", "updatedAt")
+           VALUES (?, NULL, ?, ?, ?, ?, ?, ?)`,
+          userId,
+          superAdminEmail,
+          superAdminPasswordHash,
+          "SUPER_ADMIN",
+          true,
+          now,
+          now
+        );
+        
+        superAdmin = await prisma.user.findUnique({
+          where: { id: userId },
+        });
+        
+        if (!superAdmin) {
+          throw new Error("Falha ao criar SUPER_ADMIN mesmo com NULL explícito");
+        }
+      } else {
+        throw error;
+      }
     }
   }
 
