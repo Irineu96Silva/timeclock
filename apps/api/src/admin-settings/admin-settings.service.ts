@@ -26,60 +26,98 @@ export class AdminSettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSettings(companyId: string): Promise<PublicSettings> {
-    // Tenta buscar com select explícito para evitar campos que não existem
+    // Usa raw SQL para buscar apenas campos que existem no banco
     let settings: any = null;
     
     try {
-      // Tenta buscar todos os campos
+      // Tenta buscar com todos os campos usando select explícito
       settings = await this.prisma.companySettings.findUnique({
         where: { companyId },
+        select: {
+          companyId: true,
+          geofenceEnabled: true,
+          geoRequired: true,
+          geofenceLat: true,
+          geofenceLng: true,
+          geofenceRadiusMeters: true,
+          maxAccuracyMeters: true,
+          qrEnabled: true,
+          punchFallbackMode: true,
+          qrSecret: true,
+          kioskDeviceLabel: true,
+          defaultWorkStartTime: true,
+          defaultBreakStartTime: true,
+          defaultBreakEndTime: true,
+          defaultWorkEndTime: true,
+          defaultToleranceMinutes: true,
+          defaultTimezone: true,
+        },
       });
     } catch (error: any) {
       // Se falhar por causa de campos que não existem, busca apenas campos básicos
       if (error.message?.includes("no column") || error.message?.includes("defaultWork")) {
         try {
-          // Usa raw SQL para buscar apenas campos que existem
-          const result = await this.prisma.$queryRaw<Array<{
-            companyId: string;
-            geofenceEnabled: number;
-            geoRequired: number;
-            geofenceLat: number;
-            geofenceLng: number;
-            geofenceRadiusMeters: number;
-            maxAccuracyMeters: number;
-            qrEnabled: number;
-            punchFallbackMode: string;
-            qrSecret: string;
-            kioskDeviceLabel: string;
-          }>>`
-            SELECT 
-              "companyId",
-              "geofenceEnabled",
-              "geoRequired",
-              "geofenceLat",
-              "geofenceLng",
-              "geofenceRadiusMeters",
-              "maxAccuracyMeters",
-              "qrEnabled",
-              "punchFallbackMode",
-              "qrSecret",
-              "kioskDeviceLabel"
-            FROM "CompanySettings"
-            WHERE "companyId" = ${companyId}
-            LIMIT 1
-          `;
-          
-          if (result.length > 0) {
-            settings = {
-              ...result[0],
-              geofenceEnabled: Boolean(result[0].geofenceEnabled),
-              geoRequired: Boolean(result[0].geoRequired),
-              qrEnabled: Boolean(result[0].qrEnabled),
-            };
+          settings = await this.prisma.companySettings.findUnique({
+            where: { companyId },
+            select: {
+              companyId: true,
+              geofenceEnabled: true,
+              geoRequired: true,
+              geofenceLat: true,
+              geofenceLng: true,
+              geofenceRadiusMeters: true,
+              maxAccuracyMeters: true,
+              qrEnabled: true,
+              punchFallbackMode: true,
+              qrSecret: true,
+              kioskDeviceLabel: true,
+            },
+          });
+        } catch (fallbackError: any) {
+          // Se ainda falhar, tenta com raw SQL
+          try {
+            const result = await this.prisma.$queryRaw<Array<{
+              companyId: string;
+              geofenceEnabled: number;
+              geoRequired: number;
+              geofenceLat: number;
+              geofenceLng: number;
+              geofenceRadiusMeters: number;
+              maxAccuracyMeters: number;
+              qrEnabled: number;
+              punchFallbackMode: string;
+              qrSecret: string;
+              kioskDeviceLabel: string;
+            }>>`
+              SELECT 
+                "companyId",
+                "geofenceEnabled",
+                "geoRequired",
+                "geofenceLat",
+                "geofenceLng",
+                "geofenceRadiusMeters",
+                "maxAccuracyMeters",
+                "qrEnabled",
+                "punchFallbackMode",
+                "qrSecret",
+                "kioskDeviceLabel"
+              FROM "CompanySettings"
+              WHERE "companyId" = ${companyId}
+              LIMIT 1
+            `;
+            
+            if (result.length > 0) {
+              settings = {
+                ...result[0],
+                geofenceEnabled: Boolean(result[0].geofenceEnabled),
+                geoRequired: Boolean(result[0].geoRequired),
+                qrEnabled: Boolean(result[0].qrEnabled),
+              };
+            }
+          } catch (rawError) {
+            console.error("Erro ao buscar settings:", rawError);
+            // settings permanece null
           }
-        } catch (rawError) {
-          // Se ainda falhar, settings permanece null
-          console.error("Erro ao buscar settings com raw SQL:", rawError);
         }
       } else {
         throw error;
