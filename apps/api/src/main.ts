@@ -1,33 +1,32 @@
-import { ValidationPipe } from "@nestjs/common";
+// apps/api/src/main.ts
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // ✅ CORS (Vercel + Dev local)
+  // IMPORTANT: se você usar cookies/refresh em cookie, mantenha credentials: true
   app.enableCors({
     origin: [
-      "http://localhost:5173",
       "https://timeclock-web.vercel.app",
+      "http://localhost:5173",
+      "http://localhost:3000",
     ],
-    credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+    optionsSuccessStatus: 204,
   });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-    }),
-  );
+  // (Opcional) Se você usa proxy (Render/Cloudflare) e quer IP real:
+  // app.set("trust proxy", 1);
 
   const port = Number(process.env.PORT) || 3000;
+  await app.listen(port);
 
-  // ✅ essencial em produção (Render)
-  await app.listen(port, "0.0.0.0");
-
-  console.log(`API listening on ${port}`);
+  // Se quiser logar a URL:
+  // console.log(`API listening on ${port}`);
 }
 
 bootstrap();
