@@ -19,13 +19,15 @@ function parseCorsOrigins() {
   ];
 
   const all = Array.from(new Set([...defaults, ...list]));
+  console.log("CORS allowed origins:", all);
   return all;
 }
 
 function isVercelPreview(origin: string) {
-  // aceita previews do Vercel do tipo:
-  // https://timeclock-web-xxxx.vercel.app
-  return /^https:\/\/timeclock-web-.*\.vercel\.app$/.test(origin);
+  // aceita tanto produção quanto previews do Vercel:
+  // https://timeclock-web.vercel.app (produção)
+  // https://timeclock-web-xxxx.vercel.app (previews)
+  return /^https:\/\/timeclock-web(-.*)?\.vercel\.app$/.test(origin);
 }
 
 async function bootstrap() {
@@ -38,19 +40,41 @@ async function bootstrap() {
   app.enableCors({
     origin: (origin, callback) => {
       // requests server-to-server ou healthchecks sem Origin
-      if (!origin) return callback(null, true);
+      if (!origin) {
+        console.log("CORS: Request without origin, allowing");
+        return callback(null, true);
+      }
 
-      if (allowed.includes(origin)) return callback(null, true);
-      if (isVercelPreview(origin)) return callback(null, true);
+      console.log(`CORS: Checking origin: ${origin}`);
+
+      if (allowed.includes(origin)) {
+        console.log(`CORS: Origin ${origin} is in allowed list`);
+        return callback(null, true);
+      }
+
+      if (isVercelPreview(origin)) {
+        console.log(`CORS: Origin ${origin} matches Vercel pattern`);
+        return callback(null, true);
+      }
 
       // bloqueia o que não estiver permitido
+      console.error(`CORS: Blocked origin: ${origin}`);
+      console.error(`CORS: Allowed origins:`, allowed);
       return callback(new Error(`CORS blocked for origin: ${origin}`), false);
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "Origin",
+      "X-Requested-With",
+    ],
+    exposedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
     optionsSuccessStatus: 204,
     preflightContinue: false,
+    maxAge: 86400, // 24 horas
   });
 
   app.useGlobalPipes(

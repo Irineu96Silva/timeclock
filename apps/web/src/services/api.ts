@@ -62,6 +62,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
+    credentials: "include",
+    mode: "cors",
   });
 
   if (!response.ok) {
@@ -118,6 +120,8 @@ async function requestBlob(path: string, options: RequestInit = {}): Promise<Blo
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
+    credentials: "include",
+    mode: "cors",
   });
 
   if (!response.ok) {
