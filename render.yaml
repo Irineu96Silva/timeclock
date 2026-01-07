@@ -2,7 +2,7 @@ services:
   - type: web
     name: timeclock-api
     env: node
-    buildCommand: pnpm install --prod=false && pnpm -C apps/api exec prisma generate --schema=prisma/schema.prisma && pnpm -C apps/api exec prisma migrate deploy --schema=prisma/schema.prisma && pnpm -C apps/api build
+    buildCommand: pnpm install --prod=false && pnpm -C apps/api exec prisma generate --schema=prisma/schema.prisma && pnpm -C apps/api exec prisma migrate deploy --schema=prisma/schema.prisma && pnpm -C apps/api run prisma:seed && pnpm -C apps/api build
     startCommand: node apps/api/dist/main.js
     envVars:
       - key: NODE_ENV

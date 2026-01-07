@@ -1,7 +1,28 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaLibSQL } from "@prisma/adapter-libsql";
+import { createClient } from "@libsql/client";
 import bcrypt from "bcrypt";
 
-const prisma = new PrismaClient();
+// Configura o Prisma com adaptador Turso se as variáveis estiverem disponíveis
+function buildPrismaClient() {
+  const tursoUrl = process.env.TURSO_DATABASE_URL;
+  const tursoAuthToken = process.env.TURSO_AUTH_TOKEN;
+
+  if (tursoUrl && tursoAuthToken) {
+    console.log("[Seed] Usando adaptador Turso (libsql)");
+    const libsql = createClient({
+      url: tursoUrl,
+      authToken: tursoAuthToken,
+    });
+    const adapter = new PrismaLibSQL(libsql as any);
+    return new PrismaClient({ adapter: adapter as any });
+  }
+
+  console.log("[Seed] Usando SQLite (fallback)");
+  return new PrismaClient();
+}
+
+const prisma = buildPrismaClient();
 
 async function main() {
   const companyName = "Empresa Demo";
