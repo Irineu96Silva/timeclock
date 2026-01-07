@@ -26,12 +26,68 @@ export class AdminSettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSettings(companyId: string): Promise<PublicSettings> {
-    const settings = await this.prisma.companySettings.findUnique({
-      where: { companyId },
-    });
+    // Tenta buscar com select explícito para evitar campos que não existem
+    let settings: any = null;
+    
+    try {
+      // Tenta buscar todos os campos
+      settings = await this.prisma.companySettings.findUnique({
+        where: { companyId },
+      });
+    } catch (error: any) {
+      // Se falhar por causa de campos que não existem, busca apenas campos básicos
+      if (error.message?.includes("no column") || error.message?.includes("defaultWork")) {
+        try {
+          // Usa raw SQL para buscar apenas campos que existem
+          const result = await this.prisma.$queryRaw<Array<{
+            companyId: string;
+            geofenceEnabled: number;
+            geoRequired: number;
+            geofenceLat: number;
+            geofenceLng: number;
+            geofenceRadiusMeters: number;
+            maxAccuracyMeters: number;
+            qrEnabled: number;
+            punchFallbackMode: string;
+            qrSecret: string;
+            kioskDeviceLabel: string;
+          }>>`
+            SELECT 
+              "companyId",
+              "geofenceEnabled",
+              "geoRequired",
+              "geofenceLat",
+              "geofenceLng",
+              "geofenceRadiusMeters",
+              "maxAccuracyMeters",
+              "qrEnabled",
+              "punchFallbackMode",
+              "qrSecret",
+              "kioskDeviceLabel"
+            FROM "CompanySettings"
+            WHERE "companyId" = ${companyId}
+            LIMIT 1
+          `;
+          
+          if (result.length > 0) {
+            settings = {
+              ...result[0],
+              geofenceEnabled: Boolean(result[0].geofenceEnabled),
+              geoRequired: Boolean(result[0].geoRequired),
+              qrEnabled: Boolean(result[0].qrEnabled),
+            };
+          }
+        } catch (rawError) {
+          // Se ainda falhar, settings permanece null
+          console.error("Erro ao buscar settings com raw SQL:", rawError);
+        }
+      } else {
+        throw error;
+      }
+    }
 
     if (settings) {
-      const ensured = await this.ensureQrSecret(companyId, settings.qrSecret);
+      const ensured = await this.ensureQrSecret(companyId, settings.qrSecret || "");
       return this.pickPublicSettings({ ...settings, qrSecret: ensured });
     }
 
