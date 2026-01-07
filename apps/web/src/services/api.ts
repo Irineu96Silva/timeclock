@@ -190,6 +190,7 @@ export const api = {
     request<T>(path, body ? { method: "POST", body: JSON.stringify(body) } : { method: "POST" }),
   patch: <T>(path: string, body?: unknown) =>
     request<T>(path, body ? { method: "PATCH", body: JSON.stringify(body) } : { method: "PATCH" }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   getBlob: (path: string) => requestBlob(path),
   postBlob: (path: string, body?: unknown) => requestBlobPost(path, body),
 };

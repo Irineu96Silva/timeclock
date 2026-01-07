@@ -115,13 +115,16 @@ async function main() {
   const adminPassword = "Admin123!";
 
   // 1) Company (procura primeiro; se nao existir, cria)
+  // Usa select para evitar problemas com campos que podem não existir ainda
   let company = await prisma.company.findFirst({
     where: { name: companyName },
+    select: { id: true, name: true }, // Apenas campos essenciais
   });
 
   if (!company) {
     company = await prisma.company.create({
       data: { name: companyName },
+      select: { id: true, name: true },
     });
   }
 
