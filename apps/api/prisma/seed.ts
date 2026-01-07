@@ -56,17 +56,24 @@ async function main() {
       },
     });
   } else {
-    // Não existe, cria novo
-    // Passamos companyId explicitamente como null para SUPER_ADMIN
-    superAdmin = await prisma.user.create({
-      data: {
-        email: superAdminEmail,
-        passwordHash: superAdminPasswordHash,
-        role: "SUPER_ADMIN",
-        isActive: true,
-        companyId: null, // Explicitamente null para SUPER_ADMIN
-      },
+    // Não existe, cria novo usando SQL raw para garantir que companyId seja NULL
+    // Isso evita problemas com o Prisma Client e Turso
+    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = new Date().toISOString();
+    
+    await prisma.$executeRaw`
+      INSERT INTO "User" (id, "companyId", email, "passwordHash", role, "isActive", "createdAt", "updatedAt")
+      VALUES (${userId}, NULL, ${superAdminEmail}, ${superAdminPasswordHash}, ${"SUPER_ADMIN"}, ${true}, ${now}, ${now})
+    `;
+    
+    // Busca o usuário criado
+    superAdmin = await prisma.user.findUnique({
+      where: { id: userId },
     });
+    
+    if (!superAdmin) {
+      throw new Error("Falha ao criar SUPER_ADMIN via SQL raw");
+    }
   }
 
   console.log("Super Admin criado/atualizado:");
