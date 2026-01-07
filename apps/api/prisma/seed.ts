@@ -65,16 +65,34 @@ async function main() {
     }
   } else {
     // Cria novo super admin sem companyId
-    // Passamos companyId: null explicitamente para o SUPER_ADMIN
-    superAdmin = await prisma.user.create({
-      data: {
-        email: superAdminEmail,
-        passwordHash: superAdminPasswordHash,
-        role: "SUPER_ADMIN",
-        isActive: true,
-        companyId: null,
-      },
-    });
+    // Para Turso/Libsql, precisamos ser cuidadosos com NULL values
+    try {
+      superAdmin = await prisma.user.create({
+        data: {
+          email: superAdminEmail,
+          passwordHash: superAdminPasswordHash,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        } as any, // type-cast para evitar erro de tipo
+      });
+    } catch (error: any) {
+      // Se falhar por constraint, tenta com upsert usando email como chave
+      console.log("Erro ao criar SUPER_ADMIN, tentando upsert...", error.message);
+      superAdmin = await prisma.user.upsert({
+        where: { email: superAdminEmail },
+        create: {
+          email: superAdminEmail,
+          passwordHash: superAdminPasswordHash,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        } as any,
+        update: {
+          passwordHash: superAdminPasswordHash,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        },
+      });
+    }
   }
 
   console.log("Super Admin criado/atualizado:");
