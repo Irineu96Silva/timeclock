@@ -57,16 +57,39 @@ async function main() {
       });
     } else {
       // Primeiro, tenta criar uma empresa temporária para o SUPER_ADMIN
-      // Isso contorna o problema da constraint NOT NULL
-      let tempCompany = await prisma.company.findFirst({
-        where: { name: "__SUPER_ADMIN_TEMP__" },
-      });
-
-      if (!tempCompany) {
-        tempCompany = await prisma.company.create({
-          data: { name: "__SUPER_ADMIN_TEMP__" },
-        });
+      // Usa SQL raw para evitar problemas com campos que podem não existir
+      let tempCompanyId: string | null = null;
+      
+      try {
+        const result = await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM "Company" WHERE name = '__SUPER_ADMIN_TEMP__' LIMIT 1
+        `;
+        
+        if (result.length > 0) {
+          tempCompanyId = result[0].id;
+        } else {
+          // Cria empresa temporária usando SQL raw
+          const newId = `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const now = new Date().toISOString();
+          
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "Company" (id, name, "createdAt", "updatedAt", "isActive")
+             VALUES (?, ?, ?, ?, ?)`,
+            newId,
+            "__SUPER_ADMIN_TEMP__",
+            now,
+            now,
+            true
+          );
+          
+          tempCompanyId = newId;
+        }
+      } catch (error: any) {
+        console.warn(`[Seed] Erro ao criar empresa temporária: ${error.message}`);
+        throw error;
       }
+      
+      const tempCompany = { id: tempCompanyId! };
 
       // Cria o SUPER_ADMIN com a empresa temporária
       superAdmin = await prisma.user.create({
@@ -173,26 +196,36 @@ async function main() {
   });
 
   // 5) CompanySettings padrao
-  await prisma.companySettings.upsert({
-    where: { companyId: company.id },
-    update: {
-      geofenceEnabled: true,
-      geoRequired: true,
-      geofenceLat: 0,
-      geofenceLng: 0,
-      geofenceRadiusMeters: 200,
-      maxAccuracyMeters: 100,
-    },
-    create: {
-      companyId: company.id,
-      geofenceEnabled: true,
-      geoRequired: true,
-      geofenceLat: 0,
-      geofenceLng: 0,
-      geofenceRadiusMeters: 200,
-      maxAccuracyMeters: 100,
-    },
-  });
+  // Usa SQL raw para evitar problemas com campos que podem não existir no banco Turso
+  try {
+    // Verifica se já existe
+    const existing = await prisma.$queryRaw<Array<{ companyId: string }>>`
+      SELECT "companyId" FROM "CompanySettings" WHERE "companyId" = ${company.id} LIMIT 1
+    `;
+    
+    if (existing.length > 0) {
+      // Atualiza apenas campos básicos que sabemos que existem
+      await prisma.$executeRawUnsafe(
+        `UPDATE "CompanySettings" 
+         SET "geofenceEnabled" = ?, "geoRequired" = ?, "geofenceLat" = ?, "geofenceLng" = ?, 
+             "geofenceRadiusMeters" = ?, "maxAccuracyMeters" = ?
+         WHERE "companyId" = ?`,
+        true, true, 0, 0, 200, 100, company.id
+      );
+    } else {
+      // Cria apenas com campos básicos
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "CompanySettings" 
+         ("companyId", "geofenceEnabled", "geoRequired", "geofenceLat", "geofenceLng", 
+          "geofenceRadiusMeters", "maxAccuracyMeters")
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        company.id, true, true, 0, 0, 200, 100
+      );
+    }
+  } catch (error: any) {
+    console.warn(`[Seed] Erro ao criar CompanySettings: ${error.message}`);
+    // Não quebra o build, apenas loga o aviso
+  }
 
   console.log("\nSeed concluído:");
   console.log(`Super Admin: ${superAdminEmail} / ${superAdminPassword}`);
