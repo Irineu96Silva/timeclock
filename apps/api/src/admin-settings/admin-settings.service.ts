@@ -35,27 +35,53 @@ export class AdminSettingsService {
       return this.pickPublicSettings({ ...settings, qrSecret: ensured });
     }
 
-    const created = await this.prisma.companySettings.create({
-      data: {
-        companyId,
-        geofenceEnabled: true,
-        geoRequired: true,
-        geofenceLat: 0,
-        geofenceLng: 0,
-        geofenceRadiusMeters: 200,
-        maxAccuracyMeters: 100,
-        qrEnabled: true,
-        punchFallbackMode: "GEO_OR_QR",
-        qrSecret: this.generateQrSecret(),
-        kioskDeviceLabel: "",
-        defaultWorkStartTime: "08:00",
-        defaultBreakStartTime: "12:00",
-        defaultBreakEndTime: "13:00",
-        defaultWorkEndTime: "17:00",
-        defaultToleranceMinutes: 5,
-        defaultTimezone: "America/Sao_Paulo",
-      },
-    });
+    // Se não existe, cria com campos básicos primeiro
+    let created;
+    try {
+      // Tenta criar com todos os campos
+      created = await this.prisma.companySettings.create({
+        data: {
+          companyId,
+          geofenceEnabled: true,
+          geoRequired: true,
+          geofenceLat: 0,
+          geofenceLng: 0,
+          geofenceRadiusMeters: 200,
+          maxAccuracyMeters: 100,
+          qrEnabled: true,
+          punchFallbackMode: "GEO_OR_QR",
+          qrSecret: this.generateQrSecret(),
+          kioskDeviceLabel: "",
+          defaultWorkStartTime: "08:00",
+          defaultBreakStartTime: "12:00",
+          defaultBreakEndTime: "13:00",
+          defaultWorkEndTime: "17:00",
+          defaultToleranceMinutes: 5,
+          defaultTimezone: "America/Sao_Paulo",
+        },
+      });
+    } catch (error: any) {
+      // Se campos novos não existirem, cria apenas com campos básicos
+      if (error.message?.includes("no column") || error.message?.includes("defaultWork")) {
+        created = await this.prisma.companySettings.create({
+          data: {
+            companyId,
+            geofenceEnabled: true,
+            geoRequired: true,
+            geofenceLat: 0,
+            geofenceLng: 0,
+            geofenceRadiusMeters: 200,
+            maxAccuracyMeters: 100,
+            qrEnabled: true,
+            punchFallbackMode: "GEO_OR_QR",
+            qrSecret: this.generateQrSecret(),
+            kioskDeviceLabel: "",
+          },
+        });
+      } else {
+        throw error;
+      }
+    }
 
     return this.pickPublicSettings(created);
   }
