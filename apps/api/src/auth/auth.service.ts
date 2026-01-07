@@ -37,7 +37,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role,
-      companyId: user.companyId,
+      companyId: user.companyId ?? undefined, // Converte null para undefined
     });
 
     await this.prisma.user.update({
@@ -73,7 +73,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role,
-      companyId: user.companyId,
+      companyId: user.companyId ?? undefined, // Converte null para undefined
     });
 
     await this.prisma.user.update({
