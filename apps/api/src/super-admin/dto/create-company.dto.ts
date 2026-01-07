@@ -3,7 +3,7 @@ import { IsEmail, IsNotEmpty, IsOptional, IsString, IsBoolean } from "class-vali
 export class CreateCompanyDto {
   @IsNotEmpty()
   @IsString()
-  name: string;
+  name!: string;
 
   @IsOptional()
   @IsString()
