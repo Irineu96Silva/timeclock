@@ -41,79 +41,73 @@ async function main() {
 
   let superAdmin;
   
-  // Se encontrou algum usuário
-  if (usersWithEmail.length > 0) {
-    // Pega o primeiro (deve haver apenas um SUPER_ADMIN com esse email)
-    const existing = usersWithEmail[0];
-    // Atualiza para garantir que está correto
-    superAdmin = await prisma.user.update({
-      where: { id: existing.id },
-      data: {
-        companyId: null, // Garante que é null
-        passwordHash: superAdminPasswordHash,
-        role: "SUPER_ADMIN",
-        isActive: true,
-      },
-    });
-  } else {
-    // Não existe, cria novo usando SQL raw com sintaxe que força NULL
-    // Usa Prisma.$executeRawUnsafe para ter mais controle
-    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const now = new Date().toISOString();
-    
-    try {
-      // Tenta inserir sem especificar companyId (deve ser NULL por padrão)
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "User" (id, email, "passwordHash", role, "isActive", "createdAt", "updatedAt")
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        userId,
-        superAdminEmail,
-        superAdminPasswordHash,
-        "SUPER_ADMIN",
-        true,
-        now,
-        now
-      );
-      
-      // Busca o usuário criado
-      superAdmin = await prisma.user.findUnique({
-        where: { id: userId },
+  try {
+    // Se encontrou algum usuário
+    if (usersWithEmail.length > 0) {
+      // Pega o primeiro (deve haver apenas um SUPER_ADMIN com esse email)
+      const existing = usersWithEmail[0];
+      // Atualiza para garantir que está correto
+      superAdmin = await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          passwordHash: superAdminPasswordHash,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        },
       });
-      
-      if (!superAdmin) {
-        throw new Error("Falha ao criar SUPER_ADMIN via SQL raw");
-      }
-    } catch (error: any) {
-      // Se ainda falhar, tenta com NULL explícito
-      if (error.message?.includes("NOT NULL") || error.code === "SQLITE_CONSTRAINT") {
-        await prisma.$executeRawUnsafe(
-          `INSERT INTO "User" (id, "companyId", email, "passwordHash", role, "isActive", "createdAt", "updatedAt")
-           VALUES (?, NULL, ?, ?, ?, ?, ?, ?)`,
-          userId,
-          superAdminEmail,
-          superAdminPasswordHash,
-          "SUPER_ADMIN",
-          true,
-          now,
-          now
-        );
-        
-        superAdmin = await prisma.user.findUnique({
-          where: { id: userId },
+    } else {
+      // Primeiro, tenta criar uma empresa temporária para o SUPER_ADMIN
+      // Isso contorna o problema da constraint NOT NULL
+      let tempCompany = await prisma.company.findFirst({
+        where: { name: "__SUPER_ADMIN_TEMP__" },
+      });
+
+      if (!tempCompany) {
+        tempCompany = await prisma.company.create({
+          data: { name: "__SUPER_ADMIN_TEMP__" },
         });
-        
-        if (!superAdmin) {
-          throw new Error("Falha ao criar SUPER_ADMIN mesmo com NULL explícito");
-        }
-      } else {
-        throw error;
+      }
+
+      // Cria o SUPER_ADMIN com a empresa temporária
+      superAdmin = await prisma.user.create({
+        data: {
+          companyId: tempCompany.id,
+          email: superAdminEmail,
+          passwordHash: superAdminPasswordHash,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        },
+      });
+
+      // Agora tenta atualizar para remover o companyId
+      // Se falhar, pelo menos o usuário existe
+      try {
+        await prisma.user.update({
+          where: { id: superAdmin.id },
+          data: { companyId: null },
+        });
+        // Se conseguiu, remove a empresa temporária
+        await prisma.company.delete({
+          where: { id: tempCompany.id },
+        });
+      } catch (updateError) {
+        // Se não conseguir remover o companyId, deixa como está
+        console.warn(`[Seed] Aviso: Não foi possível remover companyId do SUPER_ADMIN. O usuário foi criado com companyId=${tempCompany.id}`);
+        console.warn(`[Seed] Você pode atualizar manualmente depois ou executar uma migração para corrigir.`);
       }
     }
-  }
 
-  console.log("Super Admin criado/atualizado:");
-  console.log(`Email: ${superAdminEmail}`);
-  console.log(`Senha: ${superAdminPassword}`);
+    console.log("Super Admin criado/atualizado:");
+    console.log(`Email: ${superAdminEmail}`);
+    console.log(`Senha: ${superAdminPassword}`);
+  } catch (error: any) {
+    // Se falhar completamente, apenas loga um aviso mas não quebra o build
+    console.error(`[Seed] Erro ao criar SUPER_ADMIN: ${error.message}`);
+    console.error(`[Seed] O build continuará, mas você precisará criar o SUPER_ADMIN manualmente.`);
+    console.error(`[Seed] Email: ${superAdminEmail}`);
+    console.error(`[Seed] Senha: ${superAdminPassword}`);
+    // Não lança o erro - permite que o seed continue
+  }
 
   // 2) Criar Empresa Demo
   const companyName = "Empresa Demo";
