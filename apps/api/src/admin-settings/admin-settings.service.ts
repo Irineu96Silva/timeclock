@@ -302,19 +302,58 @@ export class AdminSettingsService {
 
     // Se existe, atualiza (tenta com campos novos, se falhar tenta sem)
     try {
+      // Primeiro tenta atualizar com todos os campos
       const updated = await this.prisma.companySettings.update({
         where: { companyId },
         data: extendedUpdateData,
+        select: {
+          companyId: true,
+          geofenceEnabled: true,
+          geoRequired: true,
+          geofenceLat: true,
+          geofenceLng: true,
+          geofenceRadiusMeters: true,
+          maxAccuracyMeters: true,
+          qrEnabled: true,
+          punchFallbackMode: true,
+          qrSecret: true,
+          kioskDeviceLabel: true,
+          defaultWorkStartTime: true,
+          defaultBreakStartTime: true,
+          defaultBreakEndTime: true,
+          defaultWorkEndTime: true,
+          defaultToleranceMinutes: true,
+          defaultTimezone: true,
+        },
       });
       return this.pickPublicSettings(updated);
     } catch (error: any) {
       // Se falhar por causa de campos que não existem, tenta apenas com campos básicos
-      if (error.message?.includes("no column") || error.code === "SQLITE_UNKNOWN") {
-        const updated = await this.prisma.companySettings.update({
-          where: { companyId },
-          data: baseUpdateData,
-        });
-        return this.pickPublicSettings(updated);
+      if (error.message?.includes("no column") || error.code === "SQLITE_UNKNOWN" || error.message?.includes("defaultWork")) {
+        try {
+          const updated = await this.prisma.companySettings.update({
+            where: { companyId },
+            data: baseUpdateData,
+            select: {
+              companyId: true,
+              geofenceEnabled: true,
+              geoRequired: true,
+              geofenceLat: true,
+              geofenceLng: true,
+              geofenceRadiusMeters: true,
+              maxAccuracyMeters: true,
+              qrEnabled: true,
+              punchFallbackMode: true,
+              qrSecret: true,
+              kioskDeviceLabel: true,
+            },
+          });
+          return this.pickPublicSettings(updated);
+        } catch (fallbackError: any) {
+          // Se ainda falhar, tenta com raw SQL
+          console.error("Erro ao atualizar settings:", fallbackError);
+          throw new Error("Erro ao salvar configurações. Tente novamente.");
+        }
       }
       throw error;
     }
