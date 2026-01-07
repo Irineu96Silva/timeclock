@@ -57,13 +57,14 @@ async function main() {
     });
   } else {
     // Não existe, cria novo
-    // Não passamos companyId, será null por padrão
+    // Passamos companyId explicitamente como null para SUPER_ADMIN
     superAdmin = await prisma.user.create({
       data: {
         email: superAdminEmail,
         passwordHash: superAdminPasswordHash,
         role: "SUPER_ADMIN",
         isActive: true,
+        companyId: null, // Explicitamente null para SUPER_ADMIN
       },
     });
   }
