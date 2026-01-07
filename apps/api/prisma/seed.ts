@@ -31,8 +31,8 @@ async function main() {
   
   const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
   
-  // Verificar se super admin já existe (busca por email e role, sem companyId)
-  const existingSuperAdmin = await prisma.user.findFirst({
+  // Buscar todos os usuários com esse email e role SUPER_ADMIN
+  const usersWithEmail = await prisma.user.findMany({
     where: {
       email: superAdminEmail,
       role: "SUPER_ADMIN",
@@ -40,59 +40,32 @@ async function main() {
   });
 
   let superAdmin;
-  if (existingSuperAdmin) {
-    // Se existe mas tem companyId, atualiza para null
-    if (existingSuperAdmin.companyId !== null) {
-      superAdmin = await prisma.user.update({
-        where: { id: existingSuperAdmin.id },
-        data: {
-          companyId: null,
-          passwordHash: superAdminPasswordHash,
-          role: "SUPER_ADMIN",
-          isActive: true,
-        },
-      });
-    } else {
-      // Se já existe e está correto, apenas atualiza a senha
-      superAdmin = await prisma.user.update({
-        where: { id: existingSuperAdmin.id },
-        data: {
-          passwordHash: superAdminPasswordHash,
-          role: "SUPER_ADMIN",
-          isActive: true,
-        },
-      });
-    }
+  
+  // Se encontrou algum usuário
+  if (usersWithEmail.length > 0) {
+    // Pega o primeiro (deve haver apenas um SUPER_ADMIN com esse email)
+    const existing = usersWithEmail[0];
+    // Atualiza para garantir que está correto
+    superAdmin = await prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        companyId: null, // Garante que é null
+        passwordHash: superAdminPasswordHash,
+        role: "SUPER_ADMIN",
+        isActive: true,
+      },
+    });
   } else {
-    // Cria novo super admin sem companyId
-    // Para Turso/Libsql, precisamos ser cuidadosos com NULL values
-    try {
-      superAdmin = await prisma.user.create({
-        data: {
-          email: superAdminEmail,
-          passwordHash: superAdminPasswordHash,
-          role: "SUPER_ADMIN",
-          isActive: true,
-        } as any, // type-cast para evitar erro de tipo
-      });
-    } catch (error: any) {
-      // Se falhar por constraint, tenta com upsert usando email como chave
-      console.log("Erro ao criar SUPER_ADMIN, tentando upsert...", error.message);
-      superAdmin = await prisma.user.upsert({
-        where: { email: superAdminEmail },
-        create: {
-          email: superAdminEmail,
-          passwordHash: superAdminPasswordHash,
-          role: "SUPER_ADMIN",
-          isActive: true,
-        } as any,
-        update: {
-          passwordHash: superAdminPasswordHash,
-          role: "SUPER_ADMIN",
-          isActive: true,
-        },
-      });
-    }
+    // Não existe, cria novo
+    // Não passamos companyId, será null por padrão
+    superAdmin = await prisma.user.create({
+      data: {
+        email: superAdminEmail,
+        passwordHash: superAdminPasswordHash,
+        role: "SUPER_ADMIN",
+        isActive: true,
+      },
+    });
   }
 
   console.log("Super Admin criado/atualizado:");
