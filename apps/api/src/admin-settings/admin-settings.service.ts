@@ -181,10 +181,59 @@ export class AdminSettingsService {
   }
 
   async updateSettings(companyId: string, dto: UpdateSettingsDto): Promise<PublicSettings> {
-    // Primeiro, verifica se as configurações existem
-    const existing = await this.prisma.companySettings.findUnique({
-      where: { companyId },
-    });
+    // Primeiro, verifica se as configurações existem usando select explícito
+    let existing: any = null;
+    try {
+      existing = await this.prisma.companySettings.findUnique({
+        where: { companyId },
+        select: {
+          companyId: true,
+          geofenceEnabled: true,
+          geoRequired: true,
+          geofenceLat: true,
+          geofenceLng: true,
+          geofenceRadiusMeters: true,
+          maxAccuracyMeters: true,
+          qrEnabled: true,
+          punchFallbackMode: true,
+          qrSecret: true,
+          kioskDeviceLabel: true,
+          defaultWorkStartTime: true,
+          defaultBreakStartTime: true,
+          defaultBreakEndTime: true,
+          defaultWorkEndTime: true,
+          defaultToleranceMinutes: true,
+          defaultTimezone: true,
+        },
+      });
+    } catch (error: any) {
+      // Se falhar por causa de campos que não existem, busca apenas campos básicos
+      if (error.message?.includes("no column") || error.message?.includes("defaultWork")) {
+        try {
+          existing = await this.prisma.companySettings.findUnique({
+            where: { companyId },
+            select: {
+              companyId: true,
+              geofenceEnabled: true,
+              geoRequired: true,
+              geofenceLat: true,
+              geofenceLng: true,
+              geofenceRadiusMeters: true,
+              maxAccuracyMeters: true,
+              qrEnabled: true,
+              punchFallbackMode: true,
+              qrSecret: true,
+              kioskDeviceLabel: true,
+            },
+          });
+        } catch (fallbackError) {
+          // Se ainda falhar, existing permanece null
+          console.error("Erro ao buscar settings:", fallbackError);
+        }
+      } else {
+        throw error;
+      }
+    }
 
     // Campos básicos que sempre existem
     const baseUpdateData: Record<string, number | boolean | string> = {};
