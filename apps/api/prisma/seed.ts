@@ -25,6 +25,45 @@ function buildPrismaClient() {
 const prisma = buildPrismaClient();
 
 async function main() {
+  // 1) Criar Super Admin
+  const superAdminEmail = "superadmin@timeclock.com";
+  const superAdminPassword = "SuperAdmin123!";
+  
+  const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
+  
+  // Verificar se super admin já existe
+  const existingSuperAdmin = await prisma.user.findFirst({
+    where: {
+      email: superAdminEmail,
+      role: "SUPER_ADMIN",
+      companyId: null,
+    },
+  });
+
+  const superAdmin = existingSuperAdmin
+    ? await prisma.user.update({
+        where: { id: existingSuperAdmin.id },
+        data: {
+          passwordHash: superAdminPasswordHash,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        },
+      })
+    : await prisma.user.create({
+        data: {
+          companyId: null,
+          email: superAdminEmail,
+          passwordHash: superAdminPasswordHash,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        },
+      });
+
+  console.log("Super Admin criado:");
+  console.log(`Email: ${superAdminEmail}`);
+  console.log(`Senha: ${superAdminPassword}`);
+
+  // 2) Criar Empresa Demo
   const companyName = "Empresa Demo";
   const adminEmail = "admin@demo.com";
   const adminPassword = "Admin123!";
@@ -40,27 +79,34 @@ async function main() {
     });
   }
 
-  // 2) Hash da senha
-  const passwordHash = await bcrypt.hash(adminPassword, 10);
-
-  // 3) User admin (usa unique composto companyId + email)
-  const adminUser = await prisma.user.upsert({
+  // 2) User admin (usa unique composto companyId + email)
+  const existingAdmin = await prisma.user.findFirst({
     where: {
-      companyId_email: { companyId: company.id, email: adminEmail },
-    },
-    update: {
-      passwordHash,
-      role: "ADMIN",
-      isActive: true,
-    },
-    create: {
       companyId: company.id,
       email: adminEmail,
-      passwordHash,
-      role: "ADMIN",
-      isActive: true,
     },
   });
+
+  const passwordHash = await bcrypt.hash(adminPassword, 10);
+  
+  const adminUser = existingAdmin
+    ? await prisma.user.update({
+        where: { id: existingAdmin.id },
+        data: {
+          passwordHash,
+          role: "ADMIN",
+          isActive: true,
+        },
+      })
+    : await prisma.user.create({
+        data: {
+          companyId: company.id,
+          email: adminEmail,
+          passwordHash,
+          role: "ADMIN",
+          isActive: true,
+        },
+      });
 
   // 4) EmployeeProfile para o admin (userId e unique)
   await prisma.employeeProfile.upsert({
@@ -99,7 +145,8 @@ async function main() {
     },
   });
 
-  console.log("Seed concluido:");
+  console.log("\nSeed concluído:");
+  console.log(`Super Admin: ${superAdminEmail} / ${superAdminPassword}`);
   console.log(`Company: ${company.name} (${company.id})`);
   console.log(`Admin: ${adminEmail} / ${adminPassword}`);
 }

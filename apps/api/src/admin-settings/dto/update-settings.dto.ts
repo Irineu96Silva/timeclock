@@ -45,4 +45,30 @@ export class UpdateSettingsDto {
   @IsString()
   @MaxLength(80)
   kioskDeviceLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  defaultWorkStartTime?: string;
+
+  @IsOptional()
+  @IsString()
+  defaultBreakStartTime?: string;
+
+  @IsOptional()
+  @IsString()
+  defaultBreakEndTime?: string;
+
+  @IsOptional()
+  @IsString()
+  defaultWorkEndTime?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  defaultToleranceMinutes?: number;
+
+  @IsOptional()
+  @IsString()
+  defaultTimezone?: string;
 }

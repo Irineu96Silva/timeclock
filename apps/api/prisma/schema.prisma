@@ -15,16 +15,29 @@ datasource db {
 
 
 model Company {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  name        String
+  cnpj        String?
+  phone       String?
+  email       String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   users       User[]
   employees   EmployeeProfile[]
+  employeeRecords Employee[]
   events      TimeClockEvent[]
   adjustments TimeAdjustmentRequest[]
   auditLogs   AuditLog[]
   settings    CompanySettings?
+
+  @@index([isActive])
+  @@index([cnpj])
 }
 
 model CompanySettings {
@@ -39,28 +52,63 @@ model CompanySettings {
   punchFallbackMode    String  @default("GEO_OR_QR") // "GEO_ONLY" | "GEO_OR_QR" | "QR_ONLY"
   qrSecret             String  @default("")
   kioskDeviceLabel     String  @default("")
+  // Configurações de jornada padrão da empresa
+  defaultWorkStartTime    String?  @default("08:00")
+  defaultBreakStartTime   String?  @default("12:00")
+  defaultBreakEndTime     String?  @default("13:00")
+  defaultWorkEndTime      String?  @default("17:00")
+  defaultToleranceMinutes Int?     @default(5)
+  defaultTimezone         String?  @default("America/Sao_Paulo")
 
   company Company @relation(fields: [companyId], references: [id])
 }
 
 model User {
   id               String   @id @default(cuid())
-  companyId        String
+  companyId        String?  // Opcional para SUPER_ADMIN
   email            String
   passwordHash     String
-  role             String // "ADMIN" | "EMPLOYEE" | "KIOSK" (validar no codigo)
+  role             String // "SUPER_ADMIN" | "ADMIN" | "EMPLOYEE" | "KIOSK"
   isActive         Boolean  @default(true)
   refreshTokenHash String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  company             Company                 @relation(fields: [companyId], references: [id])
+  company             Company?                @relation(fields: [companyId], references: [id])
   employee            EmployeeProfile?
   reviewedAdjustments TimeAdjustmentRequest[] @relation("ReviewedBy")
   auditLogs           AuditLog[]
 
   @@unique([companyId, email])
   @@index([companyId])
+  @@index([role])
+  @@index([email])
+}
+
+model Employee {
+  id          String   @id @default(cuid())
+  companyId   String
+  employeeProfileId String @unique
+  cpf         String?
+  phone       String?
+  email       String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  position    String?  // Cargo
+  department  String?  // Departamento
+  hireDate    DateTime?
+  salary      Float?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company         Company         @relation(fields: [companyId], references: [id])
+  employeeProfile EmployeeProfile @relation(fields: [employeeProfileId], references: [id])
+
+  @@index([companyId])
+  @@index([cpf])
 }
 
 model EmployeeProfile {
@@ -85,6 +133,7 @@ model EmployeeProfile {
 
   company     Company                 @relation(fields: [companyId], references: [id])
   user        User                    @relation(fields: [userId], references: [id])
+  employee    Employee?
   events      TimeClockEvent[]
   adjustments TimeAdjustmentRequest[]
 

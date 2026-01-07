@@ -14,6 +14,7 @@ import { KioskAuthModule } from "./kiosk-auth/kiosk-auth.module";
 import { KioskModule } from "./kiosk/kiosk.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { TimeClockModule } from "./timeclock/timeclock.module";
+import { SuperAdminModule } from "./super-admin/super-admin.module";
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { TimeClockModule } from "./timeclock/timeclock.module";
     KioskAuthModule,
     KioskModule,
     TimeClockModule,
+    SuperAdminModule,
   ],
   controllers: [AppController],
   providers: [

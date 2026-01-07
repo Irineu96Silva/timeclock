@@ -13,6 +13,12 @@ type PublicSettings = {
   qrEnabled: boolean;
   punchFallbackMode: string;
   kioskDeviceLabel: string;
+  defaultWorkStartTime: string | null;
+  defaultBreakStartTime: string | null;
+  defaultBreakEndTime: string | null;
+  defaultWorkEndTime: string | null;
+  defaultToleranceMinutes: number | null;
+  defaultTimezone: string | null;
 };
 
 @Injectable()
@@ -42,6 +48,12 @@ export class AdminSettingsService {
         punchFallbackMode: "GEO_OR_QR",
         qrSecret: this.generateQrSecret(),
         kioskDeviceLabel: "",
+        defaultWorkStartTime: "08:00",
+        defaultBreakStartTime: "12:00",
+        defaultBreakEndTime: "13:00",
+        defaultWorkEndTime: "17:00",
+        defaultToleranceMinutes: 5,
+        defaultTimezone: "America/Sao_Paulo",
       },
     });
 
@@ -66,6 +78,24 @@ export class AdminSettingsService {
     if (dto.kioskDeviceLabel !== undefined) {
       updateData.kioskDeviceLabel = dto.kioskDeviceLabel.trim();
     }
+    if (dto.defaultWorkStartTime !== undefined) {
+      updateData.defaultWorkStartTime = dto.defaultWorkStartTime;
+    }
+    if (dto.defaultBreakStartTime !== undefined) {
+      updateData.defaultBreakStartTime = dto.defaultBreakStartTime;
+    }
+    if (dto.defaultBreakEndTime !== undefined) {
+      updateData.defaultBreakEndTime = dto.defaultBreakEndTime;
+    }
+    if (dto.defaultWorkEndTime !== undefined) {
+      updateData.defaultWorkEndTime = dto.defaultWorkEndTime;
+    }
+    if (dto.defaultToleranceMinutes !== undefined) {
+      updateData.defaultToleranceMinutes = dto.defaultToleranceMinutes;
+    }
+    if (dto.defaultTimezone !== undefined) {
+      updateData.defaultTimezone = dto.defaultTimezone;
+    }
 
     const createData = {
       companyId,
@@ -79,6 +109,12 @@ export class AdminSettingsService {
       punchFallbackMode: dto.punchFallbackMode ?? "GEO_OR_QR",
       qrSecret: this.generateQrSecret(),
       kioskDeviceLabel: dto.kioskDeviceLabel?.trim() ?? "",
+      defaultWorkStartTime: dto.defaultWorkStartTime ?? "08:00",
+      defaultBreakStartTime: dto.defaultBreakStartTime ?? "12:00",
+      defaultBreakEndTime: dto.defaultBreakEndTime ?? "13:00",
+      defaultWorkEndTime: dto.defaultWorkEndTime ?? "17:00",
+      defaultToleranceMinutes: dto.defaultToleranceMinutes ?? 5,
+      defaultTimezone: dto.defaultTimezone ?? "America/Sao_Paulo",
     };
 
     const updated = await this.prisma.companySettings.upsert({
@@ -123,6 +159,12 @@ export class AdminSettingsService {
     punchFallbackMode: string;
     qrSecret: string;
     kioskDeviceLabel: string;
+    defaultWorkStartTime?: string | null;
+    defaultBreakStartTime?: string | null;
+    defaultBreakEndTime?: string | null;
+    defaultWorkEndTime?: string | null;
+    defaultToleranceMinutes?: number | null;
+    defaultTimezone?: string | null;
   }): PublicSettings {
     return {
       geofenceEnabled: settings.geofenceEnabled,
@@ -134,6 +176,12 @@ export class AdminSettingsService {
       qrEnabled: settings.qrEnabled,
       punchFallbackMode: settings.punchFallbackMode,
       kioskDeviceLabel: settings.kioskDeviceLabel ?? "",
+      defaultWorkStartTime: settings.defaultWorkStartTime ?? null,
+      defaultBreakStartTime: settings.defaultBreakStartTime ?? null,
+      defaultBreakEndTime: settings.defaultBreakEndTime ?? null,
+      defaultWorkEndTime: settings.defaultWorkEndTime ?? null,
+      defaultToleranceMinutes: settings.defaultToleranceMinutes ?? null,
+      defaultTimezone: settings.defaultTimezone ?? null,
     };
   }
 

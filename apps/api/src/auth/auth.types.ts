@@ -1,13 +1,13 @@
 import { UnauthorizedException } from "@nestjs/common";
 
-export const ALLOWED_ROLES = ["ADMIN", "EMPLOYEE", "KIOSK"] as const;
+export const ALLOWED_ROLES = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE", "KIOSK"] as const;
 export type UserRole = (typeof ALLOWED_ROLES)[number];
 
 export type JwtPayload = {
   sub: string;
   email: string;
   role: UserRole;
-  companyId: string;
+  companyId?: string; // Opcional para SUPER_ADMIN
 };
 
 export type AuthTokens = {
@@ -19,7 +19,7 @@ export type AuthenticatedUser = {
   id: string;
   email: string;
   role: UserRole;
-  companyId: string;
+  companyId?: string; // Opcional para SUPER_ADMIN
 };
 
 export function normalizeRole(role: string): UserRole {
