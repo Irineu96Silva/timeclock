@@ -85,7 +85,9 @@ const handleSubmit = async () => {
       if (role) {
         setUserRole(role);
       }
-      if (role === "EMPLOYEE") {
+      if (role === "SUPER_ADMIN") {
+        destination = "/super-admin/companies";
+      } else if (role === "EMPLOYEE") {
         destination = "/employee/home";
       } else if (role === "KIOSK") {
         destination = "/kiosk";
