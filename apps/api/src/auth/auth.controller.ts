@@ -64,8 +64,10 @@ export class AuthController {
     const companiesMap = new Map<string, { id: string; name: string }>();
     
     for (const user of users) {
-      if (user.company && user.company.isActive) {
+      if (user.company) {
         const company = user.company;
+        // Não verifica isActive pois pode não existir no banco
+        // Se isActive existir e for false, ainda assim mostra (usuário pode estar inativo mas precisa ver)
         if (!companiesMap.has(company.id)) {
           companiesMap.set(company.id, {
             id: company.id,

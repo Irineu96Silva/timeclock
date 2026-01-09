@@ -21,19 +21,20 @@
             autocomplete="username"
             placeholder="Digite seu email ou nome de usuário"
             required
+            @input="handleEmailInput"
             @blur="handleEmailBlur"
           />
         </label>
 
-        <label class="field" v-if="showCompanyField">
+        <label class="field">
           <span class="label">Empresa</span>
           <select
             v-model="selectedCompanyId"
             class="input"
-            required
-            v-if="showCompanyField"
+            :required="availableCompanies.length > 0"
+            :disabled="loadingCompanies || availableCompanies.length === 0"
           >
-            <option value="">Selecione a empresa</option>
+            <option value="">{{ availableCompanies.length === 0 ? "Digite o email primeiro" : "Selecione a empresa" }}</option>
             <option v-for="company in availableCompanies" :key="company.id" :value="company.id">
               {{ company.name }}
             </option>
@@ -86,36 +87,107 @@ const router = useRouter();
 const emailOrUsername = ref("");
 const password = ref("");
 const selectedCompanyId = ref("");
-const showCompanyField = ref(false);
 const availableCompanies = ref<CompanyOption[]>([]);
 const loading = ref(false);
+const loadingCompanies = ref(false);
 const error = ref("");
 const hasToken = ref(Boolean(getAccessToken()));
+let emailSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-const handleEmailBlur = async () => {
-  if (!emailOrUsername.value.trim()) {
-    showCompanyField.value = false;
+const searchCompaniesByEmail = async () => {
+  if (!emailOrUsername.value.trim() || !emailOrUsername.value.includes("@")) {
+    // Só busca se for email (contém @)
     availableCompanies.value = [];
+    selectedCompanyId.value = "";
     return;
   }
 
+  loadingCompanies.value = true;
   try {
-    // Busca empresas associadas ao email/username
+    // Busca empresas associadas ao email
     const companies = await api.get<CompanyOption[]>(`/auth/companies-by-email?email=${encodeURIComponent(emailOrUsername.value)}`);
     if (companies && companies.length > 0) {
       availableCompanies.value = companies;
-      showCompanyField.value = companies.length > 1;
+      // Se houver apenas uma empresa, seleciona automaticamente
       if (companies.length === 1) {
         selectedCompanyId.value = companies[0].id;
+      } else {
+        // Se houver múltiplas, deixa o usuário escolher
+        selectedCompanyId.value = "";
       }
     } else {
-      showCompanyField.value = false;
+      // Se não encontrar empresas, limpa o select (pode ser SUPER_ADMIN)
       availableCompanies.value = [];
+      selectedCompanyId.value = "";
     }
   } catch (err) {
-    // Se não encontrar, permite login sem empresa (para SUPER_ADMIN)
-    showCompanyField.value = false;
+    // Se der erro, limpa (pode ser SUPER_ADMIN ou usuário não encontrado)
     availableCompanies.value = [];
+    selectedCompanyId.value = "";
+    console.error("Erro ao buscar empresas:", err);
+  } finally {
+    loadingCompanies.value = false;
+  }
+};
+
+const handleEmailInput = () => {
+  // Limpa timeout anterior
+  if (emailSearchTimeout) {
+    clearTimeout(emailSearchTimeout);
+  }
+  
+  // Limpa empresas enquanto digita
+  availableCompanies.value = [];
+  selectedCompanyId.value = "";
+  
+  // Aguarda 500ms após parar de digitar para buscar
+  emailSearchTimeout = setTimeout(() => {
+    searchCompaniesByEmail();
+  }, 500);
+};
+
+const handleEmailBlur = async () => {
+  // Cancela timeout se ainda estiver aguardando
+  if (emailSearchTimeout) {
+    clearTimeout(emailSearchTimeout);
+    emailSearchTimeout = null;
+  }
+  
+  // Busca imediatamente ao sair do campo
+  await searchCompaniesByEmail();
+};
+  if (!emailOrUsername.value.trim() || !emailOrUsername.value.includes("@")) {
+    // Só busca se for email (contém @)
+    availableCompanies.value = [];
+    selectedCompanyId.value = "";
+    return;
+  }
+
+  loadingCompanies.value = true;
+  try {
+    // Busca empresas associadas ao email
+    const companies = await api.get<CompanyOption[]>(`/auth/companies-by-email?email=${encodeURIComponent(emailOrUsername.value)}`);
+    if (companies && companies.length > 0) {
+      availableCompanies.value = companies;
+      // Se houver apenas uma empresa, seleciona automaticamente
+      if (companies.length === 1) {
+        selectedCompanyId.value = companies[0].id;
+      } else {
+        // Se houver múltiplas, deixa o usuário escolher
+        selectedCompanyId.value = "";
+      }
+    } else {
+      // Se não encontrar empresas, limpa o select (pode ser SUPER_ADMIN)
+      availableCompanies.value = [];
+      selectedCompanyId.value = "";
+    }
+  } catch (err) {
+    // Se der erro, limpa (pode ser SUPER_ADMIN ou usuário não encontrado)
+    availableCompanies.value = [];
+    selectedCompanyId.value = "";
+    console.error("Erro ao buscar empresas:", err);
+  } finally {
+    loadingCompanies.value = false;
   }
 };
 
