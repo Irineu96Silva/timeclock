@@ -32,6 +32,11 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/super-admin/companies/:id",
+    component: () => import("./pages/SuperAdminCompanyManageView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/employee/home",
     component: () => import("./pages/EmployeeHomeView.vue"),
     meta: { requiresAuth: true },

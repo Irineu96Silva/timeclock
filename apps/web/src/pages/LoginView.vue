@@ -13,15 +13,31 @@
 
       <form class="form" @submit.prevent="handleSubmit">
         <label class="field">
-          <span class="label">{{ t("login.emailLabel") }}</span>
+          <span class="label">Email ou Usuário</span>
           <input
-            v-model="email"
+            v-model="emailOrUsername"
             class="input"
-            type="email"
-            autocomplete="email"
-            :placeholder="t('login.emailPlaceholder')"
+            type="text"
+            autocomplete="username"
+            placeholder="Digite seu email ou nome de usuário"
             required
+            @blur="handleEmailBlur"
           />
+        </label>
+
+        <label class="field" v-if="showCompanyField">
+          <span class="label">Empresa</span>
+          <select
+            v-model="selectedCompanyId"
+            class="input"
+            required
+            v-if="showCompanyField"
+          >
+            <option value="">Selecione a empresa</option>
+            <option v-for="company in availableCompanies" :key="company.id" :value="company.id">
+              {{ company.name }}
+            </option>
+          </select>
         </label>
 
         <label class="field">
@@ -61,21 +77,69 @@ type MeResponse = {
   role: string;
 };
 
+type CompanyOption = {
+  id: string;
+  name: string;
+};
+
 const router = useRouter();
-const email = ref("");
+const emailOrUsername = ref("");
 const password = ref("");
+const selectedCompanyId = ref("");
+const showCompanyField = ref(false);
+const availableCompanies = ref<CompanyOption[]>([]);
 const loading = ref(false);
 const error = ref("");
 const hasToken = ref(Boolean(getAccessToken()));
+
+const handleEmailBlur = async () => {
+  if (!emailOrUsername.value.trim()) {
+    showCompanyField.value = false;
+    availableCompanies.value = [];
+    return;
+  }
+
+  try {
+    // Busca empresas associadas ao email/username
+    const companies = await api.get<CompanyOption[]>(`/auth/companies-by-email?email=${encodeURIComponent(emailOrUsername.value)}`);
+    if (companies && companies.length > 0) {
+      availableCompanies.value = companies;
+      showCompanyField.value = companies.length > 1;
+      if (companies.length === 1) {
+        selectedCompanyId.value = companies[0].id;
+      }
+    } else {
+      showCompanyField.value = false;
+      availableCompanies.value = [];
+    }
+  } catch (err) {
+    // Se não encontrar, permite login sem empresa (para SUPER_ADMIN)
+    showCompanyField.value = false;
+    availableCompanies.value = [];
+  }
+};
 
 const handleSubmit = async () => {
   error.value = "";
   loading.value = true;
   try {
-    const response = await api.post<LoginResponse>("/auth/login", {
-      email: email.value,
+    const loginData: any = {
       password: password.value,
-    });
+    };
+
+    // Determina se é email ou username
+    if (emailOrUsername.value.includes("@")) {
+      loginData.email = emailOrUsername.value.toLowerCase().trim();
+    } else {
+      loginData.username = emailOrUsername.value.toLowerCase().trim();
+    }
+
+    // Adiciona companyId se foi selecionado
+    if (selectedCompanyId.value) {
+      loginData.companyId = selectedCompanyId.value;
+    }
+
+    const response = await api.post<LoginResponse>("/auth/login", loginData);
     setAccessToken(response.access_token);
     hasToken.value = true;
     let destination = "/admin/dashboard";

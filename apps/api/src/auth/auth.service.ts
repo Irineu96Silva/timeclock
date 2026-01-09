@@ -17,20 +17,49 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto): Promise<AuthTokens> {
+    // Busca usuário por email ou username
+    const whereClause: any = {
+      isActive: true,
+    };
+
+    if (dto.email) {
+      whereClause.email = dto.email.toLowerCase().trim();
+    } else if (dto.username) {
+      whereClause.username = dto.username.toLowerCase().trim();
+    } else {
+      throw new UnauthorizedException("Email ou username é obrigatório");
+    }
+
+    // Se companyId foi fornecido, adiciona ao where (multi-tenant)
+    if (dto.companyId) {
+      whereClause.companyId = dto.companyId;
+    }
+
     const user = await this.prisma.user.findFirst({
-      where: {
-        email: dto.email,
-        isActive: true,
+      where: whereClause,
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+          },
+        },
       },
     });
 
     if (!user) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException("Usuário não encontrado");
+    }
+
+    // Verifica se empresa está ativa (se houver)
+    if (user.company && !user.company.isActive) {
+      throw new UnauthorizedException("Empresa inativa");
     }
 
     const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordValid) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException("Senha incorreta");
     }
 
     const role = normalizeRole(user.role);
@@ -91,6 +120,24 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: userId },
       data: { refreshTokenHash: null },
+    });
+  }
+
+  async findUsersByEmail(email: string) {
+    return this.prisma.user.findMany({
+      where: {
+        email: email.toLowerCase().trim(),
+        isActive: true,
+      },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+          },
+        },
+      },
     });
   }
 

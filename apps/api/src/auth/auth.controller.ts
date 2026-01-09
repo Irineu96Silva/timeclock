@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { LoginDto } from "./dto/login.dto";
@@ -49,5 +49,21 @@ export class AuthController {
   ) {
     await this.authService.changePassword(user.id, dto);
     return { success: true, message: "Senha alterada com sucesso" };
+  }
+
+  @Get("companies-by-email")
+  async getCompaniesByEmail(@Query("email") email?: string) {
+    if (!email) {
+      return [];
+    }
+
+    // Busca usuários com esse email e retorna suas empresas
+    const users = await this.authService.findUsersByEmail(email);
+    const companies = users
+      .map((u) => u.company)
+      .filter((c): c is { id: string; name: string } => c !== null && c !== undefined)
+      .filter((c, index, self) => index === self.findIndex((t) => t.id === c.id));
+
+    return companies.map((c) => ({ id: c.id, name: c.name }));
   }
 }

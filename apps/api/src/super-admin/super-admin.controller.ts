@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -48,6 +49,11 @@ export class SuperAdminController {
     return this.superAdminService.updateCompany(id, dto);
   }
 
+  @Patch("companies/:id")
+  patchCompany(@Param("id") id: string, @Body() dto: UpdateCompanyDto) {
+    return this.superAdminService.updateCompany(id, dto);
+  }
+
   @Delete("companies/:id")
   deleteCompany(@Param("id") id: string) {
     return this.superAdminService.deleteCompany(id);
@@ -63,6 +69,11 @@ export class SuperAdminController {
       body.email,
       body.password,
     );
+  }
+
+  @Get("companies/:id/users")
+  getCompanyUsers(@Param("id") id: string) {
+    return this.superAdminService.getCompanyUsers(id);
   }
 }
 

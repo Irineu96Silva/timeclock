@@ -58,9 +58,9 @@
                   <button
                     class="btn btn-sm btn-ghost"
                     type="button"
-                    @click="viewCompany(company.id)"
+                    @click="manageCompany(company.id)"
                   >
-                    Ver
+                    Gerenciar
                   </button>
                   <button
                     class="btn btn-sm btn-ghost"
@@ -155,8 +155,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import { api } from "../services/api";
 import { getErrorMessage, getErrorDetails } from "../utils/errors";
+
+const router = useRouter();
 
 type Company = {
   id: string;
@@ -293,7 +296,8 @@ const confirmDelete = async (company: Company) => {
   }
 };
 
-const viewCompany = (id: string) => {
+const manageCompany = (id: string) => {
+  router.push(`/super-admin/companies/${id}`);
   // Navegar para página de detalhes (implementar depois)
   console.log("View company:", id);
 };

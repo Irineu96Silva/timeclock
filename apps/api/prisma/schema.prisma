@@ -67,6 +67,7 @@ model User {
   id               String   @id @default(cuid())
   companyId        String?  // Opcional para SUPER_ADMIN
   email            String
+  username         String?  // Login alternativo por username
   passwordHash     String
   role             String // "SUPER_ADMIN" | "ADMIN" | "EMPLOYEE" | "KIOSK"
   isActive         Boolean  @default(true)
@@ -80,9 +81,11 @@ model User {
   auditLogs           AuditLog[]
 
   @@unique([companyId, email])
+  @@unique([companyId, username])
   @@index([companyId])
   @@index([role])
   @@index([email])
+  @@index([username])
 }
 
 model Employee {
