@@ -96,15 +96,27 @@ async function main() {
       if (sqlError.code === "SQLITE_CONSTRAINT" && sqlError.message?.includes("NOT NULL")) {
         console.log("Banco não aceita NULL em companyId, criando empresa SYSTEM...");
         
-        // Busca ou cria empresa SYSTEM
+        // Busca ou cria empresa SYSTEM usando select explícito
         let systemCompany = await prisma.company.findFirst({
           where: { name: "SYSTEM" },
+          select: { id: true, name: true, createdAt: true },
         });
         
         if (!systemCompany) {
-          systemCompany = await prisma.company.create({
-            data: { name: "SYSTEM" },
+          // Cria usando raw SQL para evitar campos que não existem
+          const systemCompanyId = `system_${Date.now()}`;
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "Company" (id, name, "createdAt") VALUES (?, ?, datetime('now'))`,
+            systemCompanyId,
+            "SYSTEM"
+          );
+          systemCompany = await prisma.company.findUnique({
+            where: { id: systemCompanyId },
+            select: { id: true, name: true, createdAt: true },
           });
+          if (!systemCompany) {
+            throw new Error("Não foi possível criar empresa SYSTEM");
+          }
         }
         
         // Cria Super Admin com empresa SYSTEM
@@ -219,14 +231,27 @@ async function main() {
   const adminPassword = "Admin123!";
 
   // 1) Company (procura primeiro; se nao existir, cria)
+  // Usa select explícito para evitar campos que não existem no banco
   let company = await prisma.company.findFirst({
     where: { name: companyName },
+    select: { id: true, name: true, createdAt: true },
   });
 
   if (!company) {
-    company = await prisma.company.create({
-      data: { name: companyName },
+    // Cria usando raw SQL para evitar campos que não existem
+    const companyId = `company_${Date.now()}`;
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "Company" (id, name, "createdAt") VALUES (?, ?, datetime('now'))`,
+      companyId,
+      companyName
+    );
+    company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, name: true, createdAt: true },
     });
+    if (!company) {
+      throw new Error("Não foi possível criar empresa Demo");
+    }
   }
 
   // 2) User admin (usa unique composto companyId + email)
