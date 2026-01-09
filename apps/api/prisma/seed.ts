@@ -31,8 +31,8 @@ async function main() {
   
   const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
   
-  // Buscar todos os usuários com esse email e role SUPER_ADMIN
-  const usersWithEmail = await prisma.user.findMany({
+  // Verificar se super admin já existe (busca por email e role, sem companyId)
+  const existingSuperAdmin = await prisma.user.findFirst({
     where: {
       email: superAdminEmail,
       role: "SUPER_ADMIN",
@@ -40,97 +40,95 @@ async function main() {
   });
 
   let superAdmin;
-  
-  try {
-    // Se encontrou algum usuário
-    if (usersWithEmail.length > 0) {
-      // Pega o primeiro (deve haver apenas um SUPER_ADMIN com esse email)
-      const existing = usersWithEmail[0];
-      // Atualiza para garantir que está correto
+  if (existingSuperAdmin) {
+    // Se existe mas tem companyId, atualiza para null
+    if (existingSuperAdmin.companyId !== null) {
       superAdmin = await prisma.user.update({
-        where: { id: existing.id },
+        where: { id: existingSuperAdmin.id },
         data: {
+          companyId: null,
           passwordHash: superAdminPasswordHash,
           role: "SUPER_ADMIN",
           isActive: true,
         },
       });
     } else {
-      // Primeiro, tenta criar uma empresa temporária para o SUPER_ADMIN
-      // Usa SQL raw para evitar problemas com campos que podem não existir
-      let tempCompanyId: string | null = null;
-      
-      try {
-        const result = await prisma.$queryRaw<Array<{ id: string }>>`
-          SELECT id FROM "Company" WHERE name = '__SUPER_ADMIN_TEMP__' LIMIT 1
-        `;
-        
-        if (result.length > 0) {
-          tempCompanyId = result[0].id;
-        } else {
-          // Cria empresa temporária usando SQL raw
-          // Usa apenas campos básicos que sempre existem: id, name, createdAt
-          const newId = `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          const now = new Date().toISOString();
-          
-          // Insere apenas com campos básicos que sempre existem
-          await prisma.$executeRawUnsafe(
-            `INSERT INTO "Company" (id, name, "createdAt")
-             VALUES (?, ?, ?)`,
-            newId,
-            "__SUPER_ADMIN_TEMP__",
-            now
-          );
-          
-          tempCompanyId = newId;
-        }
-      } catch (error: any) {
-        console.warn(`[Seed] Erro ao criar empresa temporária: ${error.message}`);
-        throw error;
-      }
-      
-      const tempCompany = { id: tempCompanyId! };
-
-      // Cria o SUPER_ADMIN com a empresa temporária
-      superAdmin = await prisma.user.create({
+      // Se já existe e está correto, apenas atualiza a senha
+      superAdmin = await prisma.user.update({
+        where: { id: existingSuperAdmin.id },
         data: {
-          companyId: tempCompany.id,
-          email: superAdminEmail,
           passwordHash: superAdminPasswordHash,
           role: "SUPER_ADMIN",
           isActive: true,
         },
       });
-
-      // Agora tenta atualizar para remover o companyId
-      // Se falhar, pelo menos o usuário existe
-      try {
-        await prisma.user.update({
-          where: { id: superAdmin.id },
-          data: { companyId: null },
+    }
+  } else {
+    // Cria novo super admin sem companyId
+    // Para Turso/Libsql, precisamos ser cuidadosos com NULL values
+    try {
+      superAdmin = await prisma.user.create({
+        data: {
+          email: superAdminEmail,
+          passwordHash: superAdminPasswordHash,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        } as any, // type-cast para evitar erro de tipo
+      });
+    } catch (error: any) {
+      // Se falhar por constraint, tenta buscar novamente e atualizar
+      console.log("Erro ao criar SUPER_ADMIN, tentando buscar e atualizar...", error.message);
+      const retrySuperAdmin = await prisma.user.findFirst({
+        where: {
+          email: superAdminEmail,
+          role: "SUPER_ADMIN",
+        },
+      });
+      
+      if (retrySuperAdmin) {
+        superAdmin = await prisma.user.update({
+          where: { id: retrySuperAdmin.id },
+          data: {
+            companyId: null,
+            passwordHash: superAdminPasswordHash,
+            role: "SUPER_ADMIN",
+            isActive: true,
+          },
         });
-        // Se conseguiu, remove a empresa temporária
-        await prisma.company.delete({
-          where: { id: tempCompany.id },
+      } else {
+        // Última tentativa: usar raw SQL
+        console.log("Tentando criar SUPER_ADMIN com raw SQL...");
+        const superAdminId = `superadmin_${Date.now()}`;
+        try {
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "User" (id, email, "passwordHash", role, "isActive", "createdAt", "updatedAt", "companyId")
+             VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), NULL)`,
+            superAdminId,
+            superAdminEmail,
+            superAdminPasswordHash,
+            "SUPER_ADMIN",
+            true
+          );
+        } catch (sqlError: any) {
+          // Se falhar por constraint, tenta buscar novamente
+          console.log("Erro ao inserir com SQL, tentando buscar...", sqlError.message);
+        }
+        superAdmin = await prisma.user.findFirst({
+          where: {
+            email: superAdminEmail,
+            role: "SUPER_ADMIN",
+          },
         });
-      } catch (updateError) {
-        // Se não conseguir remover o companyId, deixa como está
-        console.warn(`[Seed] Aviso: Não foi possível remover companyId do SUPER_ADMIN. O usuário foi criado com companyId=${tempCompany.id}`);
-        console.warn(`[Seed] Você pode atualizar manualmente depois ou executar uma migração para corrigir.`);
+        if (!superAdmin) {
+          throw new Error("Não foi possível criar o Super Admin");
+        }
       }
     }
-
-    console.log("Super Admin criado/atualizado:");
-    console.log(`Email: ${superAdminEmail}`);
-    console.log(`Senha: ${superAdminPassword}`);
-  } catch (error: any) {
-    // Se falhar completamente, apenas loga um aviso mas não quebra o build
-    console.error(`[Seed] Erro ao criar SUPER_ADMIN: ${error.message}`);
-    console.error(`[Seed] O build continuará, mas você precisará criar o SUPER_ADMIN manualmente.`);
-    console.error(`[Seed] Email: ${superAdminEmail}`);
-    console.error(`[Seed] Senha: ${superAdminPassword}`);
-    // Não lança o erro - permite que o seed continue
   }
+
+  console.log("Super Admin criado/atualizado:");
+  console.log(`Email: ${superAdminEmail}`);
+  console.log(`Senha: ${superAdminPassword}`);
 
   // 2) Criar Empresa Demo
   const companyName = "Empresa Demo";
@@ -138,16 +136,13 @@ async function main() {
   const adminPassword = "Admin123!";
 
   // 1) Company (procura primeiro; se nao existir, cria)
-  // Usa select para evitar problemas com campos que podem não existir ainda
   let company = await prisma.company.findFirst({
     where: { name: companyName },
-    select: { id: true, name: true }, // Apenas campos essenciais
   });
 
   if (!company) {
     company = await prisma.company.create({
       data: { name: companyName },
-      select: { id: true, name: true },
     });
   }
 
@@ -196,36 +191,26 @@ async function main() {
   });
 
   // 5) CompanySettings padrao
-  // Usa SQL raw para evitar problemas com campos que podem não existir no banco Turso
-  try {
-    // Verifica se já existe
-    const existing = await prisma.$queryRaw<Array<{ companyId: string }>>`
-      SELECT "companyId" FROM "CompanySettings" WHERE "companyId" = ${company.id} LIMIT 1
-    `;
-    
-    if (existing.length > 0) {
-      // Atualiza apenas campos básicos que sabemos que existem
-      await prisma.$executeRawUnsafe(
-        `UPDATE "CompanySettings" 
-         SET "geofenceEnabled" = ?, "geoRequired" = ?, "geofenceLat" = ?, "geofenceLng" = ?, 
-             "geofenceRadiusMeters" = ?, "maxAccuracyMeters" = ?
-         WHERE "companyId" = ?`,
-        true, true, 0, 0, 200, 100, company.id
-      );
-    } else {
-      // Cria apenas com campos básicos
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "CompanySettings" 
-         ("companyId", "geofenceEnabled", "geoRequired", "geofenceLat", "geofenceLng", 
-          "geofenceRadiusMeters", "maxAccuracyMeters")
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        company.id, true, true, 0, 0, 200, 100
-      );
-    }
-  } catch (error: any) {
-    console.warn(`[Seed] Erro ao criar CompanySettings: ${error.message}`);
-    // Não quebra o build, apenas loga o aviso
-  }
+  await prisma.companySettings.upsert({
+    where: { companyId: company.id },
+    update: {
+      geofenceEnabled: true,
+      geoRequired: true,
+      geofenceLat: 0,
+      geofenceLng: 0,
+      geofenceRadiusMeters: 200,
+      maxAccuracyMeters: 100,
+    },
+    create: {
+      companyId: company.id,
+      geofenceEnabled: true,
+      geoRequired: true,
+      geofenceLat: 0,
+      geofenceLng: 0,
+      geofenceRadiusMeters: 200,
+      maxAccuracyMeters: 100,
+    },
+  });
 
   console.log("\nSeed concluído:");
   console.log(`Super Admin: ${superAdminEmail} / ${superAdminPassword}`);

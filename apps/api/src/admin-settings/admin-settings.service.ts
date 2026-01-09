@@ -352,9 +352,84 @@ export class AdminSettingsService {
           });
           return this.pickPublicSettings(updated);
         } catch (fallbackError: any) {
-          // Se ainda falhar, tenta com raw SQL
-          console.error("Erro ao atualizar settings:", fallbackError);
-          throw new Error("Erro ao salvar configurações. Tente novamente.");
+          // Se ainda falhar, tenta com raw SQL para atualizar apenas campos básicos
+          console.error("Erro ao atualizar settings com Prisma, tentando raw SQL...", fallbackError.message);
+          try {
+            const updateFields: string[] = [];
+            const updateValues: any[] = [];
+            
+            if (dto.geofenceLat !== undefined) {
+              updateFields.push(`"geofenceLat" = ?`);
+              updateValues.push(dto.geofenceLat);
+            }
+            if (dto.geofenceLng !== undefined) {
+              updateFields.push(`"geofenceLng" = ?`);
+              updateValues.push(dto.geofenceLng);
+            }
+            if (dto.geofenceRadiusMeters !== undefined) {
+              updateFields.push(`"geofenceRadiusMeters" = ?`);
+              updateValues.push(dto.geofenceRadiusMeters);
+            }
+            if (dto.maxAccuracyMeters !== undefined) {
+              updateFields.push(`"maxAccuracyMeters" = ?`);
+              updateValues.push(dto.maxAccuracyMeters);
+            }
+            if (dto.geofenceEnabled !== undefined) {
+              updateFields.push(`"geofenceEnabled" = ?`);
+              updateValues.push(dto.geofenceEnabled ? 1 : 0);
+            }
+            if (dto.geoRequired !== undefined) {
+              updateFields.push(`"geoRequired" = ?`);
+              updateValues.push(dto.geoRequired ? 1 : 0);
+            }
+            if (dto.qrEnabled !== undefined) {
+              updateFields.push(`"qrEnabled" = ?`);
+              updateValues.push(dto.qrEnabled ? 1 : 0);
+            }
+            if (dto.punchFallbackMode !== undefined) {
+              updateFields.push(`"punchFallbackMode" = ?`);
+              updateValues.push(dto.punchFallbackMode);
+            }
+            if (dto.kioskDeviceLabel !== undefined) {
+              updateFields.push(`"kioskDeviceLabel" = ?`);
+              updateValues.push(dto.kioskDeviceLabel.trim());
+            }
+            
+            if (updateFields.length > 0) {
+              updateValues.push(companyId);
+              await this.prisma.$executeRawUnsafe(
+                `UPDATE "CompanySettings" SET ${updateFields.join(", ")} WHERE "companyId" = ?`,
+                ...updateValues
+              );
+            }
+            
+            // Busca novamente para retornar
+            const updated = await this.prisma.companySettings.findUnique({
+              where: { companyId },
+              select: {
+                companyId: true,
+                geofenceEnabled: true,
+                geoRequired: true,
+                geofenceLat: true,
+                geofenceLng: true,
+                geofenceRadiusMeters: true,
+                maxAccuracyMeters: true,
+                qrEnabled: true,
+                punchFallbackMode: true,
+                qrSecret: true,
+                kioskDeviceLabel: true,
+              },
+            });
+            
+            if (!updated) {
+              throw new Error("Configurações não encontradas após atualização");
+            }
+            
+            return this.pickPublicSettings(updated);
+          } catch (rawError: any) {
+            console.error("Erro ao atualizar settings com raw SQL:", rawError);
+            throw new Error("Erro ao salvar configurações. Tente novamente.");
+          }
         }
       }
       throw error;

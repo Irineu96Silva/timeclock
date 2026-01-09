@@ -141,3 +141,4 @@ A geolocalização está **funcionando corretamente**:
 - Permitir múltiplos pontos de geofence (sede + filiais)
 - Histórico de localizações no mapa
 
+

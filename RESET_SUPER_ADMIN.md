@@ -146,3 +146,4 @@ O script tentará criar com uma empresa temporária e depois você pode atualiza
 
 Verifique se as variáveis de ambiente `TURSO_DATABASE_URL` e `TURSO_AUTH_TOKEN` estão corretas.
 
+

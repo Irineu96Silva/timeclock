@@ -38,3 +38,4 @@ export class UpdateCompanyDto {
   isActive?: boolean;
 }
 
+
