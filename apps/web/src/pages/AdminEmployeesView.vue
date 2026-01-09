@@ -1,5 +1,5 @@
 <template>
-  <section class="page-grid">
+  <section class="page-grid page-grid--admin">
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">{{ t("admin.employees.createTitle") }}</h2>

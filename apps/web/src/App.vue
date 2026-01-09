@@ -1,6 +1,9 @@
 <template>
   <div class="app-shell">
-    <header v-if="!isKioskRoute" class="app-header">
+    <header 
+      v-if="!isKioskRoute" 
+      :class="['app-header', isEmployeeRoute ? 'app-header--employee-mobile' : '']"
+    >
       <div class="app-brand">
         <p class="kicker">{{ t("app.kicker") }}</p>
         <h1 class="title">{{ headerTitle }}</h1>
@@ -63,6 +66,7 @@ const userRole = computed(() => getUserRole()?.toUpperCase());
 const isSuperAdminRoute = computed(() => route.path.startsWith("/super-admin"));
 const isAdminRoute = computed(() => route.path.startsWith("/admin"));
 const isKioskRoute = computed(() => route.path.startsWith("/kiosk"));
+const isEmployeeRoute = computed(() => route.path.startsWith("/employee"));
 
 const headerTitle = computed(() => {
   const path = route.path;
