@@ -299,26 +299,59 @@ async function main() {
   });
 
   // 5) CompanySettings padrao
-  await prisma.companySettings.upsert({
-    where: { companyId: company.id },
-    update: {
-      geofenceEnabled: true,
-      geoRequired: true,
-      geofenceLat: 0,
-      geofenceLng: 0,
-      geofenceRadiusMeters: 200,
-      maxAccuracyMeters: 100,
-    },
-    create: {
-      companyId: company.id,
-      geofenceEnabled: true,
-      geoRequired: true,
-      geofenceLat: 0,
-      geofenceLng: 0,
-      geofenceRadiusMeters: 200,
-      maxAccuracyMeters: 100,
-    },
-  });
+  // Usa raw SQL para evitar campos que não existem no banco
+  try {
+    // Verifica se já existe
+    const existingSettings = await prisma.$queryRawUnsafe(
+      `SELECT "companyId" FROM "CompanySettings" WHERE "companyId" = ? LIMIT 1`,
+      company.id
+    ) as Array<{ companyId: string }>;
+    
+    if (existingSettings.length > 0) {
+      // Atualiza apenas campos básicos
+      await prisma.$executeRawUnsafe(
+        `UPDATE "CompanySettings" 
+         SET "geofenceEnabled" = ?, "geoRequired" = ?, "geofenceLat" = ?, "geofenceLng" = ?, 
+             "geofenceRadiusMeters" = ?, "maxAccuracyMeters" = ?, "qrEnabled" = ?, 
+             "punchFallbackMode" = ?, "qrSecret" = ?, "kioskDeviceLabel" = ?
+         WHERE "companyId" = ?`,
+        true,  // geofenceEnabled
+        true,  // geoRequired
+        0,     // geofenceLat
+        0,     // geofenceLng
+        200,   // geofenceRadiusMeters
+        100,   // maxAccuracyMeters
+        true,  // qrEnabled
+        "GEO_OR_QR",  // punchFallbackMode
+        "",    // qrSecret
+        "",    // kioskDeviceLabel
+        company.id
+      );
+    } else {
+      // Cria apenas com campos básicos
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "CompanySettings" 
+         ("companyId", "geofenceEnabled", "geoRequired", "geofenceLat", "geofenceLng", 
+          "geofenceRadiusMeters", "maxAccuracyMeters", "qrEnabled", "punchFallbackMode", 
+          "qrSecret", "kioskDeviceLabel")
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        company.id,
+        true,  // geofenceEnabled
+        true,  // geoRequired
+        0,     // geofenceLat
+        0,     // geofenceLng
+        200,   // geofenceRadiusMeters
+        100,   // maxAccuracyMeters
+        true,  // qrEnabled
+        "GEO_OR_QR",  // punchFallbackMode
+        "",    // qrSecret
+        ""     // kioskDeviceLabel
+      );
+    }
+  } catch (error: any) {
+    // Se falhar, apenas loga o erro mas não interrompe o seed
+    console.log("Aviso: Não foi possível criar/atualizar CompanySettings:", error.message);
+  }
 
   console.log("\nSeed concluído:");
   console.log(`Super Admin: ${superAdminEmail} / ${superAdminPassword}`);
