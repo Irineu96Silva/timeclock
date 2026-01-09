@@ -41,27 +41,10 @@ async function main() {
 
   let superAdmin;
   if (existingSuperAdmin) {
-    // Se existe mas tem companyId, atualiza para null usando raw SQL diretamente
-    // (evita problemas com constraint NOT NULL no Turso)
-    if (existingSuperAdmin.companyId !== null) {
-      console.log("Atualizando Super Admin: removendo companyId e atualizando senha...");
-      await prisma.$executeRawUnsafe(
-        `UPDATE "User" SET "companyId" = NULL, "passwordHash" = ?, "role" = ?, "isActive" = ?, "updatedAt" = datetime('now') WHERE "id" = ?`,
-        superAdminPasswordHash,
-        "SUPER_ADMIN",
-        true,
-        existingSuperAdmin.id
-      );
-      // Busca novamente após atualizar
-      superAdmin = await prisma.user.findUnique({
-        where: { id: existingSuperAdmin.id },
-      });
-      if (!superAdmin) {
-        throw new Error("Não foi possível atualizar o Super Admin");
-      }
-    } else {
-      // Se já existe e está correto, apenas atualiza a senha (sem tocar no companyId)
-      console.log("Atualizando senha do Super Admin...");
+    // Se existe, apenas atualiza a senha e outros campos (sem tocar no companyId)
+    // O banco Turso pode ter constraint NOT NULL, então não tentamos atualizar companyId para NULL
+    console.log("Atualizando senha do Super Admin existente...");
+    try {
       await prisma.$executeRawUnsafe(
         `UPDATE "User" SET "passwordHash" = ?, "role" = ?, "isActive" = ?, "updatedAt" = datetime('now') WHERE "id" = ?`,
         superAdminPasswordHash,
@@ -75,14 +58,26 @@ async function main() {
       if (!superAdmin) {
         throw new Error("Não foi possível atualizar o Super Admin");
       }
+    } catch (error: any) {
+      // Se falhar, tenta com Prisma (sem tocar no companyId)
+      console.log("Erro ao atualizar com raw SQL, tentando com Prisma...", error.message);
+      superAdmin = await prisma.user.update({
+        where: { id: existingSuperAdmin.id },
+        data: {
+          passwordHash: superAdminPasswordHash,
+          role: "SUPER_ADMIN",
+          isActive: true,
+        },
+      });
     }
   } else {
-    // Cria novo super admin sem companyId usando raw SQL diretamente
-    // (evita problemas com constraint NOT NULL no Turso)
-    console.log("Criando novo Super Admin com raw SQL...");
+    // Cria novo super admin
+    // Primeiro tenta com NULL, se falhar cria uma empresa SYSTEM e usa ela
+    console.log("Criando novo Super Admin...");
     const superAdminId = `superadmin_${Date.now()}`;
     
     try {
+      // Tenta inserir com companyId = NULL
       await prisma.$executeRawUnsafe(
         `INSERT INTO "User" (id, email, "passwordHash", role, "isActive", "createdAt", "updatedAt", "companyId")
          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), NULL)`,
@@ -97,30 +92,115 @@ async function main() {
         where: { id: superAdminId },
       });
     } catch (sqlError: any) {
-      // Se falhar por constraint (ex: email já existe), tenta buscar
-      console.log("Erro ao inserir com SQL, tentando buscar existente...", sqlError.message);
-      const retrySuperAdmin = await prisma.user.findFirst({
-        where: {
-          email: superAdminEmail,
-          role: "SUPER_ADMIN",
-        },
-      });
-      
-      if (retrySuperAdmin) {
-        // Se encontrou, atualiza usando raw SQL
-        console.log("Super Admin já existe, atualizando...");
-        await prisma.$executeRawUnsafe(
-          `UPDATE "User" SET "companyId" = NULL, "passwordHash" = ?, "role" = ?, "isActive" = ?, "updatedAt" = datetime('now') WHERE "id" = ?`,
-          superAdminPasswordHash,
-          "SUPER_ADMIN",
-          true,
-          retrySuperAdmin.id
-        );
-        superAdmin = await prisma.user.findUnique({
-          where: { id: retrySuperAdmin.id },
+      // Se falhar por constraint NOT NULL, cria empresa SYSTEM e usa ela
+      if (sqlError.code === "SQLITE_CONSTRAINT" && sqlError.message?.includes("NOT NULL")) {
+        console.log("Banco não aceita NULL em companyId, criando empresa SYSTEM...");
+        
+        // Busca ou cria empresa SYSTEM
+        let systemCompany = await prisma.company.findFirst({
+          where: { name: "SYSTEM" },
         });
+        
+        if (!systemCompany) {
+          systemCompany = await prisma.company.create({
+            data: { name: "SYSTEM" },
+          });
+        }
+        
+        // Cria Super Admin com empresa SYSTEM
+        try {
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "User" (id, email, "passwordHash", role, "isActive", "createdAt", "updatedAt", "companyId")
+             VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)`,
+            superAdminId,
+            superAdminEmail,
+            superAdminPasswordHash,
+            "SUPER_ADMIN",
+            true,
+            systemCompany.id
+          );
+          superAdmin = await prisma.user.findUnique({
+            where: { id: superAdminId },
+          });
+        } catch (createError: any) {
+          // Se ainda falhar, tenta buscar existente
+          console.log("Erro ao criar com empresa SYSTEM, tentando buscar existente...", createError.message);
+          const retrySuperAdmin = await prisma.user.findFirst({
+            where: {
+              email: superAdminEmail,
+              role: "SUPER_ADMIN",
+            },
+          });
+          
+          if (retrySuperAdmin) {
+            // Se encontrou, apenas atualiza senha
+            console.log("Super Admin já existe, atualizando senha...");
+            try {
+              await prisma.$executeRawUnsafe(
+                `UPDATE "User" SET "passwordHash" = ?, "role" = ?, "isActive" = ?, "updatedAt" = datetime('now') WHERE "id" = ?`,
+                superAdminPasswordHash,
+                "SUPER_ADMIN",
+                true,
+                retrySuperAdmin.id
+              );
+              superAdmin = await prisma.user.findUnique({
+                where: { id: retrySuperAdmin.id },
+              });
+            } catch (updateError: any) {
+              // Se falhar, tenta com Prisma
+              console.log("Erro ao atualizar com raw SQL, tentando com Prisma...", updateError.message);
+              superAdmin = await prisma.user.update({
+                where: { id: retrySuperAdmin.id },
+                data: {
+                  passwordHash: superAdminPasswordHash,
+                  role: "SUPER_ADMIN",
+                  isActive: true,
+                },
+              });
+            }
+          } else {
+            throw new Error(`Não foi possível criar o Super Admin: ${createError.message}`);
+          }
+        }
       } else {
-        throw new Error(`Não foi possível criar o Super Admin: ${sqlError.message}`);
+        // Outro tipo de erro (ex: email já existe), tenta buscar
+        console.log("Erro ao inserir com SQL, tentando buscar existente...", sqlError.message);
+        const retrySuperAdmin = await prisma.user.findFirst({
+          where: {
+            email: superAdminEmail,
+            role: "SUPER_ADMIN",
+          },
+        });
+        
+        if (retrySuperAdmin) {
+          // Se encontrou, apenas atualiza senha
+          console.log("Super Admin já existe, atualizando senha...");
+          try {
+            await prisma.$executeRawUnsafe(
+              `UPDATE "User" SET "passwordHash" = ?, "role" = ?, "isActive" = ?, "updatedAt" = datetime('now') WHERE "id" = ?`,
+              superAdminPasswordHash,
+              "SUPER_ADMIN",
+              true,
+              retrySuperAdmin.id
+            );
+            superAdmin = await prisma.user.findUnique({
+              where: { id: retrySuperAdmin.id },
+            });
+          } catch (updateError: any) {
+            // Se falhar, tenta com Prisma
+            console.log("Erro ao atualizar com raw SQL, tentando com Prisma...", updateError.message);
+            superAdmin = await prisma.user.update({
+              where: { id: retrySuperAdmin.id },
+              data: {
+                passwordHash: superAdminPasswordHash,
+                role: "SUPER_ADMIN",
+                isActive: true,
+              },
+            });
+          }
+        } else {
+          throw new Error(`Não foi possível criar o Super Admin: ${sqlError.message}`);
+        }
       }
     }
     
