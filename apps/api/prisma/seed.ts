@@ -24,6 +24,40 @@ function buildPrismaClient() {
 
 const prisma = buildPrismaClient();
 
+// Função helper para retry com backoff exponencial
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  delayMs: number = 1000
+): Promise<T> {
+  let lastError: any;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      lastError = error;
+      // Se for erro de servidor (502, 503, 504) ou timeout, tenta novamente
+      if (
+        error.code === "SERVER_ERROR" ||
+        error.message?.includes("502") ||
+        error.message?.includes("503") ||
+        error.message?.includes("504") ||
+        error.message?.includes("timeout")
+      ) {
+        if (attempt < maxRetries - 1) {
+          const waitTime = delayMs * Math.pow(2, attempt);
+          console.log(`Erro de conexão (tentativa ${attempt + 1}/${maxRetries}), aguardando ${waitTime}ms...`);
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+          continue;
+        }
+      }
+      // Se não for erro de rede, propaga imediatamente
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
 async function main() {
   // 1) Criar Super Admin
   const superAdminEmail = "superadmin@timeclock.com";
@@ -32,12 +66,22 @@ async function main() {
   const superAdminPasswordHash = await bcrypt.hash(superAdminPassword, 10);
   
   // Verificar se super admin já existe (busca por email e role, sem companyId)
-  const existingSuperAdmin = await prisma.user.findFirst({
-    where: {
-      email: superAdminEmail,
-      role: "SUPER_ADMIN",
-    },
-  });
+  // Usa retry para lidar com erros temporários de conexão (502, 503, etc)
+  let existingSuperAdmin;
+  try {
+    existingSuperAdmin = await withRetry(async () => {
+      return await prisma.user.findFirst({
+        where: {
+          email: superAdminEmail,
+          role: "SUPER_ADMIN",
+        },
+      });
+    }, 5, 2000); // 5 tentativas, começando com 2 segundos
+  } catch (error: any) {
+    console.error("Erro ao buscar Super Admin existente:", error.message);
+    // Se falhar completamente, assume que não existe e tenta criar
+    existingSuperAdmin = null;
+  }
 
   let superAdmin;
   if (existingSuperAdmin) {
@@ -232,10 +276,13 @@ async function main() {
 
   // 1) Company (procura primeiro; se nao existir, cria)
   // Usa select explícito para evitar campos que não existem no banco
-  let company = await prisma.company.findFirst({
-    where: { name: companyName },
-    select: { id: true, name: true, createdAt: true },
-  });
+  // Usa retry para lidar com erros temporários de conexão
+  let company = await withRetry(async () => {
+    return await prisma.company.findFirst({
+      where: { name: companyName },
+      select: { id: true, name: true, createdAt: true },
+    });
+  }, 5, 2000);
 
   if (!company) {
     // Cria usando raw SQL para evitar campos que não existem
@@ -255,98 +302,113 @@ async function main() {
   }
 
   // 2) User admin (usa unique composto companyId + email)
-  const existingAdmin = await prisma.user.findFirst({
-    where: {
-      companyId: company.id,
-      email: adminEmail,
-    },
-  });
+  // Usa retry para lidar com erros temporários de conexão
+  const existingAdmin = await withRetry(async () => {
+    return await prisma.user.findFirst({
+      where: {
+        companyId: company.id,
+        email: adminEmail,
+      },
+    });
+  }, 5, 2000);
 
   const passwordHash = await bcrypt.hash(adminPassword, 10);
   
-  const adminUser = existingAdmin
-    ? await prisma.user.update({
-        where: { id: existingAdmin.id },
-        data: {
-          passwordHash,
-          role: "ADMIN",
-          isActive: true,
-        },
-      })
-    : await prisma.user.create({
-        data: {
-          companyId: company.id,
-          email: adminEmail,
-          passwordHash,
-          role: "ADMIN",
-          isActive: true,
-        },
-      });
+  // Usa retry para criar/atualizar admin user
+  const adminUser = await withRetry(async () => {
+    return existingAdmin
+      ? await prisma.user.update({
+          where: { id: existingAdmin.id },
+          data: {
+            passwordHash,
+            role: "ADMIN",
+            isActive: true,
+          },
+        })
+      : await prisma.user.create({
+          data: {
+            companyId: company.id,
+            email: adminEmail,
+            passwordHash,
+            role: "ADMIN",
+            isActive: true,
+          },
+        });
+  }, 5, 2000);
 
   // 4) EmployeeProfile para o admin (userId e unique)
-  await prisma.employeeProfile.upsert({
-    where: { userId: adminUser.id },
-    update: {
-      fullName: "Admin Demo",
-      isActive: true,
-    },
-    create: {
-      companyId: company.id,
-      userId: adminUser.id,
-      fullName: "Admin Demo",
-      isActive: true,
-    },
-  });
+  // Usa retry para criar/atualizar employee profile
+  await withRetry(async () => {
+    return await prisma.employeeProfile.upsert({
+      where: { userId: adminUser.id },
+      update: {
+        fullName: "Admin Demo",
+        isActive: true,
+      },
+      create: {
+        companyId: company.id,
+        userId: adminUser.id,
+        fullName: "Admin Demo",
+        isActive: true,
+      },
+    });
+  }, 5, 2000);
 
   // 5) CompanySettings padrao
   // Usa raw SQL para evitar campos que não existem no banco
   try {
-    // Verifica se já existe
-    const existingSettings = await prisma.$queryRawUnsafe(
-      `SELECT "companyId" FROM "CompanySettings" WHERE "companyId" = ? LIMIT 1`,
-      company.id
-    ) as Array<{ companyId: string }>;
+    // Verifica se já existe (com retry)
+    const existingSettings = await withRetry(async () => {
+      return await prisma.$queryRawUnsafe(
+        `SELECT "companyId" FROM "CompanySettings" WHERE "companyId" = ? LIMIT 1`,
+        company.id
+      ) as Array<{ companyId: string }>;
+    }, 5, 2000);
     
     if (existingSettings.length > 0) {
-      // Atualiza apenas campos básicos
-      await prisma.$executeRawUnsafe(
-        `UPDATE "CompanySettings" 
-         SET "geofenceEnabled" = ?, "geoRequired" = ?, "geofenceLat" = ?, "geofenceLng" = ?, 
-             "geofenceRadiusMeters" = ?, "maxAccuracyMeters" = ?, "qrEnabled" = ?, 
-             "punchFallbackMode" = ?, "qrSecret" = ?, "kioskDeviceLabel" = ?
-         WHERE "companyId" = ?`,
-        true,  // geofenceEnabled
-        true,  // geoRequired
-        0,     // geofenceLat
-        0,     // geofenceLng
-        200,   // geofenceRadiusMeters
-        100,   // maxAccuracyMeters
-        true,  // qrEnabled
-        "GEO_OR_QR",  // punchFallbackMode
-        "",    // qrSecret
-        "",    // kioskDeviceLabel
-        company.id
-      );
+      // Atualiza apenas campos básicos (com retry)
+      await withRetry(async () => {
+        return await prisma.$executeRawUnsafe(
+          `UPDATE "CompanySettings" 
+           SET "geofenceEnabled" = ?, "geoRequired" = ?, "geofenceLat" = ?, "geofenceLng" = ?, 
+               "geofenceRadiusMeters" = ?, "maxAccuracyMeters" = ?, "qrEnabled" = ?, 
+               "punchFallbackMode" = ?, "qrSecret" = ?, "kioskDeviceLabel" = ?
+           WHERE "companyId" = ?`,
+          true,  // geofenceEnabled
+          true,  // geoRequired
+          0,     // geofenceLat
+          0,     // geofenceLng
+          200,   // geofenceRadiusMeters
+          100,   // maxAccuracyMeters
+          true,  // qrEnabled
+          "GEO_OR_QR",  // punchFallbackMode
+          "",    // qrSecret
+          "",    // kioskDeviceLabel
+          company.id
+        );
+      }, 5, 2000);
     } else {
-      // Cria apenas com campos básicos
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "CompanySettings" 
-         ("companyId", "geofenceEnabled", "geoRequired", "geofenceLat", "geofenceLng", 
-          "geofenceRadiusMeters", "maxAccuracyMeters", "qrEnabled", "punchFallbackMode", 
-          "qrSecret", "kioskDeviceLabel")
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        company.id,
-        true,  // geofenceEnabled
-        true,  // geoRequired
-        0,     // geofenceLat
-        0,     // geofenceLng
-        200,   // geofenceRadiusMeters
-        100,   // maxAccuracyMeters
-        true,  // qrEnabled
-        "GEO_OR_QR",  // punchFallbackMode
-        "",    // qrSecret
-        ""     // kioskDeviceLabel
-      );
+      // Cria apenas com campos básicos (com retry)
+      await withRetry(async () => {
+        return await prisma.$executeRawUnsafe(
+          `INSERT INTO "CompanySettings" 
+           ("companyId", "geofenceEnabled", "geoRequired", "geofenceLat", "geofenceLng", 
+            "geofenceRadiusMeters", "maxAccuracyMeters", "qrEnabled", "punchFallbackMode", 
+            "qrSecret", "kioskDeviceLabel")
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          company.id,
+          true,  // geofenceEnabled
+          true,  // geoRequired
+          0,     // geofenceLat
+          0,     // geofenceLng
+          200,   // geofenceRadiusMeters
+          100,   // maxAccuracyMeters
+          true,  // qrEnabled
+          "GEO_OR_QR",  // punchFallbackMode
+          "",    // qrSecret
+          ""     // kioskDeviceLabel
+        );
+      }, 5, 2000);
     }
   } catch (error: any) {
     // Se falhar, apenas loga o erro mas não interrompe o seed
