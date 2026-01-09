@@ -41,17 +41,41 @@ async function main() {
 
   let superAdmin;
   if (existingSuperAdmin) {
-    // Se existe mas tem companyId, atualiza para null
+    // Se existe mas tem companyId, atualiza para null usando raw SQL
     if (existingSuperAdmin.companyId !== null) {
-      superAdmin = await prisma.user.update({
-        where: { id: existingSuperAdmin.id },
-        data: {
-          companyId: null,
-          passwordHash: superAdminPasswordHash,
-          role: "SUPER_ADMIN",
-          isActive: true,
-        },
-      });
+      try {
+        // Tenta atualizar com Prisma primeiro
+        superAdmin = await prisma.user.update({
+          where: { id: existingSuperAdmin.id },
+          data: {
+            companyId: null,
+            passwordHash: superAdminPasswordHash,
+            role: "SUPER_ADMIN",
+            isActive: true,
+          },
+        });
+      } catch (error: any) {
+        // Se falhar por constraint, usa raw SQL
+        if (error.code === "SQLITE_CONSTRAINT" || error.message?.includes("NOT NULL")) {
+          console.log("Erro ao atualizar com Prisma, usando raw SQL...");
+          await prisma.$executeRawUnsafe(
+            `UPDATE "User" SET "companyId" = NULL, "passwordHash" = ?, "role" = ?, "isActive" = ?, "updatedAt" = datetime('now') WHERE "id" = ?`,
+            superAdminPasswordHash,
+            "SUPER_ADMIN",
+            true,
+            existingSuperAdmin.id
+          );
+          // Busca novamente após atualizar
+          superAdmin = await prisma.user.findUnique({
+            where: { id: existingSuperAdmin.id },
+          });
+          if (!superAdmin) {
+            throw new Error("Não foi possível atualizar o Super Admin");
+          }
+        } else {
+          throw error;
+        }
+      }
     } else {
       // Se já existe e está correto, apenas atualiza a senha
       superAdmin = await prisma.user.update({
@@ -86,15 +110,38 @@ async function main() {
       });
       
       if (retrySuperAdmin) {
-        superAdmin = await prisma.user.update({
-          where: { id: retrySuperAdmin.id },
-          data: {
-            companyId: null,
-            passwordHash: superAdminPasswordHash,
-            role: "SUPER_ADMIN",
-            isActive: true,
-          },
-        });
+        try {
+          superAdmin = await prisma.user.update({
+            where: { id: retrySuperAdmin.id },
+            data: {
+              companyId: null,
+              passwordHash: superAdminPasswordHash,
+              role: "SUPER_ADMIN",
+              isActive: true,
+            },
+          });
+        } catch (updateError: any) {
+          // Se falhar por constraint, usa raw SQL
+          if (updateError.code === "SQLITE_CONSTRAINT" || updateError.message?.includes("NOT NULL")) {
+            console.log("Erro ao atualizar com Prisma, usando raw SQL...");
+            await prisma.$executeRawUnsafe(
+              `UPDATE "User" SET "companyId" = NULL, "passwordHash" = ?, "role" = ?, "isActive" = ?, "updatedAt" = datetime('now') WHERE "id" = ?`,
+              superAdminPasswordHash,
+              "SUPER_ADMIN",
+              true,
+              retrySuperAdmin.id
+            );
+            // Busca novamente após atualizar
+            superAdmin = await prisma.user.findUnique({
+              where: { id: retrySuperAdmin.id },
+            });
+            if (!superAdmin) {
+              throw new Error("Não foi possível atualizar o Super Admin");
+            }
+          } else {
+            throw updateError;
+          }
+        }
       } else {
         // Última tentativa: usar raw SQL
         console.log("Tentando criar SUPER_ADMIN com raw SQL...");
