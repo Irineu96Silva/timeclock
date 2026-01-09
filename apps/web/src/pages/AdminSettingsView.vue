@@ -183,7 +183,12 @@
       </form>
 
       <div v-if="success" class="alert alert-success">{{ success }}</div>
-      <div v-if="error" class="alert alert-error">{{ error }}</div>
+      <div v-if="error" class="alert alert-error">
+        <div><strong>Erro:</strong> {{ error }}</div>
+        <div v-if="errorDetails" style="margin-top: 0.5rem; font-size: 0.875rem; opacity: 0.8;">
+          {{ errorDetails }}
+        </div>
+      </div>
     </div>
   </section>
 
@@ -221,8 +226,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from "vue";
 import { t } from "../i18n";
-import { api } from "../services/api";
-import { getErrorMessage } from "../utils/errors";
+import { api, ApiError } from "../services/api";
+import { getErrorMessage, getErrorDetails } from "../utils/errors";
 
 type SettingsResponse = {
   geofenceEnabled: boolean;
@@ -263,6 +268,7 @@ const form = reactive<SettingsResponse>({
 const loading = ref(true);
 const saving = ref(false);
 const error = ref("");
+const errorDetails = ref("");
 const success = ref("");
 const regeneratingSecret = ref(false);
 const creatingKiosk = ref(false);
@@ -274,11 +280,20 @@ const kioskCopied = ref(false);
 const loadSettings = async () => {
   loading.value = true;
   error.value = "";
+  errorDetails.value = "";
   try {
     const data = await api.get<SettingsResponse>("/admin/settings");
     Object.assign(form, data);
   } catch (err) {
     error.value = getErrorMessage(err);
+    const details = getErrorDetails(err);
+    if (details.code || details.status) {
+      errorDetails.value = `Código: ${details.code || "N/A"} | Status: ${details.status || "N/A"}`;
+      if (details.details) {
+        errorDetails.value += ` | Detalhes: ${JSON.stringify(details.details)}`;
+      }
+    }
+    console.error("Erro ao carregar configurações:", err);
   } finally {
     loading.value = false;
   }
@@ -286,6 +301,7 @@ const loadSettings = async () => {
 
 const handleSave = async () => {
   error.value = "";
+  errorDetails.value = "";
   success.value = "";
   saving.value = true;
   try {
@@ -310,6 +326,14 @@ const handleSave = async () => {
     success.value = t("admin.settings.saved");
   } catch (err) {
     error.value = getErrorMessage(err);
+    const details = getErrorDetails(err);
+    if (details.code || details.status) {
+      errorDetails.value = `Código: ${details.code || "N/A"} | Status: ${details.status || "N/A"}`;
+      if (details.details) {
+        errorDetails.value += ` | Detalhes: ${JSON.stringify(details.details)}`;
+      }
+    }
+    console.error("Erro ao salvar configurações:", err);
   } finally {
     saving.value = false;
   }

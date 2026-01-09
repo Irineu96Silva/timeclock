@@ -76,20 +76,8 @@ export class AdminSettingsService {
         } catch (fallbackError: any) {
           // Se ainda falhar, tenta com raw SQL
           try {
-            const result = await this.prisma.$queryRaw<Array<{
-              companyId: string;
-              geofenceEnabled: number;
-              geoRequired: number;
-              geofenceLat: number;
-              geofenceLng: number;
-              geofenceRadiusMeters: number;
-              maxAccuracyMeters: number;
-              qrEnabled: number;
-              punchFallbackMode: string;
-              qrSecret: string;
-              kioskDeviceLabel: string;
-            }>>`
-              SELECT 
+            const result = await this.prisma.$queryRawUnsafe(
+              `SELECT 
                 "companyId",
                 "geofenceEnabled",
                 "geoRequired",
@@ -102,9 +90,22 @@ export class AdminSettingsService {
                 "qrSecret",
                 "kioskDeviceLabel"
               FROM "CompanySettings"
-              WHERE "companyId" = ${companyId}
-              LIMIT 1
-            `;
+              WHERE "companyId" = ?
+              LIMIT 1`,
+              companyId
+            ) as Array<{
+              companyId: string;
+              geofenceEnabled: number;
+              geoRequired: number;
+              geofenceLat: number;
+              geofenceLng: number;
+              geofenceRadiusMeters: number;
+              maxAccuracyMeters: number;
+              qrEnabled: number;
+              punchFallbackMode: string;
+              qrSecret: string;
+              kioskDeviceLabel: string;
+            }>;
             
             if (result.length > 0) {
               settings = {
@@ -125,8 +126,14 @@ export class AdminSettingsService {
     }
 
     if (settings) {
-      const ensured = await this.ensureQrSecret(companyId, settings.qrSecret || "");
-      return this.pickPublicSettings({ ...settings, qrSecret: ensured });
+      try {
+        const ensured = await this.ensureQrSecret(companyId, settings.qrSecret || "");
+        return this.pickPublicSettings({ ...settings, qrSecret: ensured });
+      } catch (error: any) {
+        // Se falhar ao garantir QR secret, retorna sem ele
+        console.error("Erro ao garantir QR secret:", error.message);
+        return this.pickPublicSettings({ ...settings, qrSecret: settings.qrSecret || "" });
+      }
     }
 
     // Se não existe, cria com campos básicos primeiro
@@ -495,15 +502,34 @@ export class AdminSettingsService {
     };
   }
 
-  private async ensureQrSecret(companyId: string, currentSecret: string) {
+  private async ensureQrSecret(companyId: string, currentSecret: string): Promise<string> {
     if (currentSecret && currentSecret.trim() !== "") {
       return currentSecret;
     }
     const secret = this.generateQrSecret();
-    await this.prisma.companySettings.update({
-      where: { companyId },
-      data: { qrSecret: secret },
-    });
+    try {
+      await this.prisma.companySettings.update({
+        where: { companyId },
+        data: { qrSecret: secret },
+      });
+    } catch (error: any) {
+      // Se falhar ao atualizar, tenta com raw SQL
+      if (error.message?.includes("no column") || error.code === "SQLITE_UNKNOWN") {
+        try {
+          await this.prisma.$executeRawUnsafe(
+            `UPDATE "CompanySettings" SET "qrSecret" = ? WHERE "companyId" = ?`,
+            secret,
+            companyId
+          );
+        } catch (sqlError: any) {
+          // Se ainda falhar, apenas retorna o secret gerado
+          console.error("Erro ao atualizar QR secret com raw SQL:", sqlError.message);
+        }
+      } else {
+        // Se ainda falhar, apenas retorna o secret gerado
+        console.error("Erro ao atualizar QR secret:", error.message);
+      }
+    }
     return secret;
   }
 

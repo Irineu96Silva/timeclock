@@ -14,11 +14,14 @@ export class SuperAdminService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAllCompanies() {
-    // Usa include para pegar todos os campos disponíveis, mas trata erros
+    // Usa select explícito para evitar campos que não existem
     try {
       const companies = await this.prisma.company.findMany({
         orderBy: { createdAt: "desc" },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
           _count: {
             select: {
               users: true,
@@ -26,27 +29,60 @@ export class SuperAdminService {
               events: true,
             },
           },
-          settings: true,
         },
       });
       
-      // Retorna apenas campos que existem, preenchendo com null os que não existem
-      return companies.map((company: any) => ({
-        id: company.id,
-        name: company.name,
-        cnpj: company.cnpj ?? null,
-        phone: company.phone ?? null,
-        email: company.email ?? null,
-        address: company.address ?? null,
-        city: company.city ?? null,
-        state: company.state ?? null,
-        zipCode: company.zipCode ?? null,
-        isActive: company.isActive ?? true,
-        createdAt: company.createdAt,
-        updatedAt: company.updatedAt ?? null,
-        _count: company._count,
-        settings: company.settings,
-      }));
+      // Busca settings separadamente para cada empresa
+      const companiesWithSettings = await Promise.all(
+        companies.map(async (company) => {
+          try {
+            const settings = await this.prisma.companySettings.findUnique({
+              where: { companyId: company.id },
+              select: {
+                companyId: true,
+                geofenceEnabled: true,
+                geoRequired: true,
+                geofenceLat: true,
+                geofenceLng: true,
+                geofenceRadiusMeters: true,
+                maxAccuracyMeters: true,
+                qrEnabled: true,
+                punchFallbackMode: true,
+              },
+            });
+            return {
+              ...company,
+              cnpj: null,
+              phone: null,
+              email: null,
+              address: null,
+              city: null,
+              state: null,
+              zipCode: null,
+              isActive: true,
+              updatedAt: null,
+              settings,
+            };
+          } catch (error: any) {
+            // Se falhar ao buscar settings, retorna sem eles
+            return {
+              ...company,
+              cnpj: null,
+              phone: null,
+              email: null,
+              address: null,
+              city: null,
+              state: null,
+              zipCode: null,
+              isActive: true,
+              updatedAt: null,
+              settings: null,
+            };
+          }
+        })
+      );
+      
+      return companiesWithSettings;
     } catch (error: any) {
       // Se falhar, tenta buscar apenas campos básicos
       if (error.message?.includes("no column")) {
@@ -85,25 +121,102 @@ export class SuperAdminService {
   }
 
   async getCompanyById(id: string) {
-    const company = await this.prisma.company.findUnique({
-      where: { id },
-      include: {
-        settings: true,
-        _count: {
-          select: {
-            users: true,
-            employees: true,
-            events: true,
+    try {
+      const company = await this.prisma.company.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+          _count: {
+            select: {
+              users: true,
+              employees: true,
+              events: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!company) {
-      throw new NotFoundException("Empresa não encontrada");
+      if (!company) {
+        throw new NotFoundException("Empresa não encontrada");
+      }
+
+      // Busca settings separadamente
+      let settings = null;
+      try {
+        settings = await this.prisma.companySettings.findUnique({
+          where: { companyId: id },
+          select: {
+            companyId: true,
+            geofenceEnabled: true,
+            geoRequired: true,
+            geofenceLat: true,
+            geofenceLng: true,
+            geofenceRadiusMeters: true,
+            maxAccuracyMeters: true,
+            qrEnabled: true,
+            punchFallbackMode: true,
+          },
+        });
+      } catch (error: any) {
+        // Se falhar, settings permanece null
+        console.error("Erro ao buscar settings da empresa:", error.message);
+      }
+
+      return {
+        ...company,
+        cnpj: null,
+        phone: null,
+        email: null,
+        address: null,
+        city: null,
+        state: null,
+        zipCode: null,
+        isActive: true,
+        updatedAt: null,
+        settings,
+      };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      // Se falhar por causa de campos que não existem, tenta buscar apenas básicos
+      if (error.message?.includes("no column")) {
+        const company = await this.prisma.company.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            name: true,
+            createdAt: true,
+          },
+        });
+
+        if (!company) {
+          throw new NotFoundException("Empresa não encontrada");
+        }
+
+        return {
+          ...company,
+          cnpj: null,
+          phone: null,
+          email: null,
+          address: null,
+          city: null,
+          state: null,
+          zipCode: null,
+          isActive: true,
+          updatedAt: null,
+          _count: {
+            users: 0,
+            employees: 0,
+            events: 0,
+          },
+          settings: null,
+        };
+      }
+      throw error;
     }
-
-    return company;
   }
 
   async createCompany(dto: CreateCompanyDto) {

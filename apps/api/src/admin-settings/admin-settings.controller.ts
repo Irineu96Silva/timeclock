@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -15,8 +15,11 @@ export class AdminSettingsController {
   constructor(private readonly adminSettingsService: AdminSettingsService) {}
 
   @Get()
-  getSettings(@CurrentUser() user: AuthenticatedUser) {
-    return this.adminSettingsService.getSettings(user.companyId!);
+  async getSettings(@CurrentUser() user: AuthenticatedUser) {
+    if (!user.companyId) {
+      throw new BadRequestException("CompanyId é obrigatório");
+    }
+    return this.adminSettingsService.getSettings(user.companyId);
   }
 
   @Patch()

@@ -12,7 +12,12 @@
       </div>
 
       <div v-if="loading" class="muted">Carregando empresas...</div>
-      <div v-else-if="error" class="alert alert-error">{{ error }}</div>
+      <div v-else-if="error" class="alert alert-error">
+        <div><strong>Erro:</strong> {{ error }}</div>
+        <div v-if="errorDetails" style="margin-top: 0.5rem; font-size: 0.875rem; opacity: 0.8;">
+          {{ errorDetails }}
+        </div>
+      </div>
       <div v-else-if="companies.length === 0" class="muted">
         <div style="text-align: center; padding: 2rem;">
           <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">Nenhuma empresa cadastrada</p>
@@ -193,10 +198,19 @@ const form = ref({
 const loadCompanies = async () => {
   loading.value = true;
   error.value = "";
+  errorDetails.value = "";
   try {
     companies.value = await api.get<Company[]>("/super-admin/companies");
   } catch (err) {
     error.value = getErrorMessage(err);
+    const details = getErrorDetails(err);
+    if (details.code || details.status) {
+      errorDetails.value = `Código: ${details.code || "N/A"} | Status: ${details.status || "N/A"}`;
+      if (details.details) {
+        errorDetails.value += ` | Detalhes: ${JSON.stringify(details.details)}`;
+      }
+    }
+    console.error("Erro ao carregar empresas:", err);
   } finally {
     loading.value = false;
   }
@@ -236,6 +250,7 @@ const editCompany = (company: Company) => {
 const handleSubmit = async () => {
   submitting.value = true;
   error.value = "";
+  errorDetails.value = "";
   try {
     if (editingCompany.value) {
       await api.patch(`/super-admin/companies/${editingCompany.value.id}`, form.value);
@@ -246,6 +261,14 @@ const handleSubmit = async () => {
     closeModal();
   } catch (err) {
     error.value = getErrorMessage(err);
+    const details = getErrorDetails(err);
+    if (details.code || details.status) {
+      errorDetails.value = `Código: ${details.code || "N/A"} | Status: ${details.status || "N/A"}`;
+      if (details.details) {
+        errorDetails.value += ` | Detalhes: ${JSON.stringify(details.details)}`;
+      }
+    }
+    console.error("Erro ao salvar empresa:", err);
   } finally {
     submitting.value = false;
   }

@@ -28,7 +28,7 @@ const CODE_MAP: Record<string, string> = {
 const normalizeMessage = (message: string) =>
   message.trim().replace(/\.$/, "").toLowerCase();
 
-export const getErrorMessage = (error: unknown) => {
+export const getErrorMessage = (error: unknown): string => {
   if (error instanceof ApiError) {
     if (error.code && CODE_MAP[error.code]) {
       return CODE_MAP[error.code];
@@ -46,7 +46,11 @@ export const getErrorMessage = (error: unknown) => {
     if (error.status === 400) {
       return t("errors.badRequest");
     }
-    return t("errors.unexpected");
+    // Retorna mensagem detalhada com código e status
+    if (error.status >= 500) {
+      return `${error.message} (Erro ${error.status}${error.code ? ` - Código: ${error.code}` : ""})`;
+    }
+    return error.message || t("errors.unexpected");
   }
 
   if (error instanceof Error) {
@@ -54,7 +58,19 @@ export const getErrorMessage = (error: unknown) => {
     if (mapped) {
       return mapped;
     }
+    return error.message;
   }
 
   return t("errors.unexpected");
+};
+
+export const getErrorDetails = (error: unknown): { code?: string; status?: number; details?: unknown } => {
+  if (error instanceof ApiError) {
+    return {
+      code: error.code,
+      status: error.status,
+      details: error.details,
+    };
+  }
+  return {};
 };

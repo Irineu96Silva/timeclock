@@ -1,6 +1,7 @@
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
+import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
 
 function parseCorsOrigins() {
   // Você pode controlar pelo Render com CORS_ORIGINS (csv)
@@ -76,6 +77,9 @@ async function bootstrap() {
     preflightContinue: false,
     maxAge: 86400, // 24 horas
   });
+
+  // Filtro global de exceções para melhor tratamento de erros
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   app.useGlobalPipes(
     new ValidationPipe({
