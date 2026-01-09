@@ -397,11 +397,25 @@ async function main() {
   if (!company) {
     // Cria usando raw SQL para evitar campos que não existem
     const companyId = `company_${Date.now()}`;
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO "Company" (id, name, "createdAt") VALUES (?, ?, datetime('now'))`,
-      companyId,
-      companyName
-    );
+    try {
+      // Tenta criar com isActive se a coluna existir
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "Company" (id, name, "isActive", "createdAt") VALUES (?, ?, 1, datetime('now'))`,
+        companyId,
+        companyName
+      );
+    } catch (error: any) {
+      // Se isActive não existir, cria sem ele
+      if (error.message?.includes("no such column") || error.message?.includes("isActive")) {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "Company" (id, name, "createdAt") VALUES (?, ?, datetime('now'))`,
+          companyId,
+          companyName
+        );
+      } else {
+        throw error;
+      }
+    }
     company = await prisma.company.findUnique({
       where: { id: companyId },
       select: { id: true, name: true, createdAt: true },

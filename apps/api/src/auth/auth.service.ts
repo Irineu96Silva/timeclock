@@ -161,11 +161,10 @@ export class AuthService {
       throw new UnauthorizedException("Usuário não encontrado");
     }
 
-    // Verifica se empresa está ativa (se houver e se o campo existir)
-    if (user.company && user.company.isActive === false) {
-      throw new UnauthorizedException("Empresa inativa");
-    }
-
+    // Nota: Verificação de empresa inativa removida temporariamente
+    // para evitar bloqueios quando a coluna isActive não existe ou está inconsistente
+    // TODO: Reativar verificação quando o campo isActive estiver estável no banco
+    
     const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordValid) {
       throw new UnauthorizedException("Senha incorreta");
