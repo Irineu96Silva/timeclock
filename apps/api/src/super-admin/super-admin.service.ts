@@ -442,7 +442,10 @@ export class SuperAdminService {
   async deleteCompany(id: string) {
     const company = await this.prisma.company.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
         _count: {
           select: {
             users: true,
@@ -508,6 +511,11 @@ export class SuperAdminService {
   async createCompanyAdmin(companyId: string, email: string, password: string) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+      },
     });
 
     if (!company) {
@@ -553,6 +561,11 @@ export class SuperAdminService {
   async getCompanyStats(companyId: string) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+      },
     });
 
     if (!company) {

@@ -48,15 +48,39 @@ export class AuthService {
 
       // Busca company separadamente se necessário
       if (user && user.companyId) {
-        const company = await this.prisma.company.findUnique({
-          where: { id: user.companyId },
-          select: {
-            id: true,
-            name: true,
-            isActive: true,
-          },
-        });
-        user.company = company;
+        try {
+          const company = await this.prisma.company.findUnique({
+            where: { id: user.companyId },
+            select: {
+              id: true,
+              name: true,
+            },
+          });
+          // Tenta buscar isActive usando raw SQL se necessário
+          if (company) {
+            try {
+              const companyStatus = await this.prisma.$queryRawUnsafe<Array<{ isActive: number }>>(
+                `SELECT "isActive" FROM "Company" WHERE "id" = ? LIMIT 1`,
+                user.companyId
+              );
+              user.company = {
+                ...company,
+                isActive: companyStatus?.[0]?.isActive === 1,
+              };
+            } catch {
+              // Se isActive não existir, assume que está ativa
+              user.company = {
+                ...company,
+                isActive: true,
+              };
+            }
+          } else {
+            user.company = null;
+          }
+        } catch (error: any) {
+          // Se falhar, tenta buscar apenas campos básicos
+          user.company = null;
+        }
       } else {
         user.company = null;
       }
@@ -86,15 +110,38 @@ export class AuthService {
           user = users[0];
           // Busca company separadamente
           if (user.companyId) {
-            const company = await this.prisma.company.findUnique({
-              where: { id: user.companyId },
-              select: {
-                id: true,
-                name: true,
-                isActive: true,
-              },
-            });
-            user.company = company;
+            try {
+              const company = await this.prisma.company.findUnique({
+                where: { id: user.companyId },
+                select: {
+                  id: true,
+                  name: true,
+                },
+              });
+              // Tenta buscar isActive usando raw SQL se necessário
+              if (company) {
+                try {
+                  const companyStatus = await this.prisma.$queryRawUnsafe<Array<{ isActive: number }>>(
+                    `SELECT "isActive" FROM "Company" WHERE "id" = ? LIMIT 1`,
+                    user.companyId
+                  );
+                  user.company = {
+                    ...company,
+                    isActive: companyStatus?.[0]?.isActive === 1,
+                  };
+                } catch {
+                  // Se isActive não existir, assume que está ativa
+                  user.company = {
+                    ...company,
+                    isActive: true,
+                  };
+                }
+              } else {
+                user.company = null;
+              }
+            } catch (error: any) {
+              user.company = null;
+            }
           } else {
             user.company = null;
           }
@@ -114,8 +161,8 @@ export class AuthService {
       throw new UnauthorizedException("Usuário não encontrado");
     }
 
-    // Verifica se empresa está ativa (se houver)
-    if (user.company && !user.company.isActive) {
+    // Verifica se empresa está ativa (se houver e se o campo existir)
+    if (user.company && user.company.isActive === false) {
       throw new UnauthorizedException("Empresa inativa");
     }
 
@@ -197,7 +244,7 @@ export class AuthService {
   }
 
   async findUsersByEmail(email: string) {
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       where: {
         email: email.toLowerCase().trim(),
         isActive: true,
@@ -211,15 +258,57 @@ export class AuthService {
         companyId: true,
         createdAt: true,
         updatedAt: true,
-        company: {
-          select: {
-            id: true,
-            name: true,
-            isActive: true,
-          },
-        },
       },
     });
+
+    // Busca companies separadamente para evitar problema com isActive
+    const usersWithCompanies = await Promise.all(
+      users.map(async (u) => {
+        if (u.companyId) {
+          try {
+            const company = await this.prisma.company.findUnique({
+              where: { id: u.companyId },
+              select: {
+                id: true,
+                name: true,
+              },
+            });
+            // Tenta buscar isActive usando raw SQL
+            if (company) {
+              try {
+                const companyStatus = await this.prisma.$queryRawUnsafe<Array<{ isActive: number }>>(
+                  `SELECT "isActive" FROM "Company" WHERE "id" = ? LIMIT 1`,
+                  u.companyId
+                );
+                return {
+                  ...u,
+                  company: {
+                    ...company,
+                    isActive: companyStatus?.[0]?.isActive === 1,
+                  },
+                };
+              } catch {
+                return {
+                  ...u,
+                  company: {
+                    ...company,
+                    isActive: true,
+                  },
+                };
+              }
+            }
+          } catch {
+            // Ignora erro
+          }
+        }
+        return {
+          ...u,
+          company: null,
+        };
+      })
+    );
+
+    return usersWithCompanies;
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
