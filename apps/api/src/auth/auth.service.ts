@@ -178,12 +178,28 @@ export class AuthService {
       companyId: user.companyId ?? undefined, // Converte null para undefined
     });
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        refreshTokenHash: await bcrypt.hash(tokens.refresh_token, 10),
-      },
-    });
+    // Usa raw SQL para atualizar refreshTokenHash sem tentar atualizar username
+    const refreshTokenHash = await bcrypt.hash(tokens.refresh_token, 10);
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE "User" SET "refreshTokenHash" = ?, "updatedAt" = datetime('now') WHERE "id" = ?`,
+        refreshTokenHash,
+        user.id
+      );
+    } catch (error: any) {
+      // Se falhar, tenta com Prisma (pode funcionar se username existir)
+      try {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            refreshTokenHash,
+          },
+        });
+      } catch {
+        // Ignora erro se ambos falharem
+        console.error("Erro ao atualizar refreshTokenHash:", error);
+      }
+    }
 
     return tokens;
   }
@@ -225,21 +241,51 @@ export class AuthService {
       companyId: user.companyId ?? undefined, // Converte null para undefined
     });
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        refreshTokenHash: await bcrypt.hash(tokens.refresh_token, 10),
-      },
-    });
+    // Usa raw SQL para atualizar refreshTokenHash sem tentar atualizar username
+    const refreshTokenHash = await bcrypt.hash(tokens.refresh_token, 10);
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE "User" SET "refreshTokenHash" = ?, "updatedAt" = datetime('now') WHERE "id" = ?`,
+        refreshTokenHash,
+        user.id
+      );
+    } catch (error: any) {
+      // Se falhar, tenta com Prisma (pode funcionar se username existir)
+      try {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            refreshTokenHash,
+          },
+        });
+      } catch {
+        // Ignora erro se ambos falharem
+        console.error("Erro ao atualizar refreshTokenHash:", error);
+      }
+    }
 
     return tokens;
   }
 
   async logout(userId: string): Promise<void> {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshTokenHash: null },
-    });
+    // Usa raw SQL para atualizar refreshTokenHash sem tentar atualizar username
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE "User" SET "refreshTokenHash" = NULL, "updatedAt" = datetime('now') WHERE "id" = ?`,
+        userId
+      );
+    } catch (error: any) {
+      // Se falhar, tenta com Prisma (pode funcionar se username existir)
+      try {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { refreshTokenHash: null },
+        });
+      } catch {
+        // Ignora erro se ambos falharem
+        console.error("Erro ao atualizar refreshTokenHash no logout:", error);
+      }
+    }
   }
 
   async findUsersByEmail(email: string) {
@@ -335,10 +381,24 @@ export class AuthService {
     }
 
     const newPasswordHash = await bcrypt.hash(dto.newPassword, 10);
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash: newPasswordHash },
-    });
+    // Usa raw SQL para atualizar passwordHash sem tentar atualizar username
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE "User" SET "passwordHash" = ?, "updatedAt" = datetime('now') WHERE "id" = ?`,
+        newPasswordHash,
+        userId
+      );
+    } catch (error: any) {
+      // Se falhar, tenta com Prisma (pode funcionar se username existir)
+      try {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { passwordHash: newPasswordHash },
+        });
+      } catch {
+        throw new UnauthorizedException("Erro ao atualizar senha");
+      }
+    }
   }
 
   private async issueTokens(payload: JwtPayload): Promise<AuthTokens> {
