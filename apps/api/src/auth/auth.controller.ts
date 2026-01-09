@@ -59,11 +59,22 @@ export class AuthController {
 
     // Busca usuários com esse email e retorna suas empresas
     const users = await this.authService.findUsersByEmail(email);
-    const companies = users
-      .map((u) => u.company)
-      .filter((c): c is { id: string; name: string } => c !== null && c !== undefined)
-      .filter((c, index, self) => index === self.findIndex((t) => t.id === c.id));
+    
+    // Filtra empresas válidas e remove duplicatas
+    const companiesMap = new Map<string, { id: string; name: string }>();
+    
+    for (const user of users) {
+      if (user.company && user.company.isActive) {
+        const company = user.company;
+        if (!companiesMap.has(company.id)) {
+          companiesMap.set(company.id, {
+            id: company.id,
+            name: company.name,
+          });
+        }
+      }
+    }
 
-    return companies.map((c) => ({ id: c.id, name: c.name }));
+    return Array.from(companiesMap.values());
   }
 }
