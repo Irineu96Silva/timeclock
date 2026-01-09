@@ -156,7 +156,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { api } from "../services/api";
-import { getErrorMessage } from "../utils/errors";
+import { getErrorMessage, getErrorDetails } from "../utils/errors";
 
 type Company = {
   id: string;
@@ -179,6 +179,7 @@ type Company = {
 const companies = ref<Company[]>([]);
 const loading = ref(true);
 const error = ref("");
+const errorDetails = ref("");
 const showCreateModal = ref(false);
 const editingCompany = ref<Company | null>(null);
 const submitting = ref(false);
