@@ -156,40 +156,6 @@ const handleEmailBlur = async () => {
   // Busca imediatamente ao sair do campo
   await searchCompaniesByEmail();
 };
-  if (!emailOrUsername.value.trim() || !emailOrUsername.value.includes("@")) {
-    // Só busca se for email (contém @)
-    availableCompanies.value = [];
-    selectedCompanyId.value = "";
-    return;
-  }
-
-  loadingCompanies.value = true;
-  try {
-    // Busca empresas associadas ao email
-    const companies = await api.get<CompanyOption[]>(`/auth/companies-by-email?email=${encodeURIComponent(emailOrUsername.value)}`);
-    if (companies && companies.length > 0) {
-      availableCompanies.value = companies;
-      // Se houver apenas uma empresa, seleciona automaticamente
-      if (companies.length === 1) {
-        selectedCompanyId.value = companies[0].id;
-      } else {
-        // Se houver múltiplas, deixa o usuário escolher
-        selectedCompanyId.value = "";
-      }
-    } else {
-      // Se não encontrar empresas, limpa o select (pode ser SUPER_ADMIN)
-      availableCompanies.value = [];
-      selectedCompanyId.value = "";
-    }
-  } catch (err) {
-    // Se der erro, limpa (pode ser SUPER_ADMIN ou usuário não encontrado)
-    availableCompanies.value = [];
-    selectedCompanyId.value = "";
-    console.error("Erro ao buscar empresas:", err);
-  } finally {
-    loadingCompanies.value = false;
-  }
-};
 
 const handleSubmit = async () => {
   error.value = "";
