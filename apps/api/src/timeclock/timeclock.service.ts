@@ -436,36 +436,115 @@ export class TimeClockService {
     return employee;
   }
 
-  private async getCompanySettings(companyId: string) {
-    const settings = await this.prisma.companySettings.findUnique({
-      where: { companyId },
-    });
+  private async getCompanySettings(companyId: string): Promise<CompanySettingsSnapshot> {
+    // Usa raw SQL para buscar apenas campos que existem no banco
+    try {
+      const result = await this.prisma.$queryRawUnsafe(
+        `SELECT 
+          "companyId",
+          "geofenceEnabled",
+          "geoRequired",
+          "geofenceLat",
+          "geofenceLng",
+          "geofenceRadiusMeters",
+          "maxAccuracyMeters",
+          "qrEnabled",
+          "punchFallbackMode",
+          "qrSecret",
+          "kioskDeviceLabel"
+        FROM "CompanySettings"
+        WHERE "companyId" = ?
+        LIMIT 1`,
+        companyId
+      ) as Array<{
+        companyId: string;
+        geofenceEnabled: number;
+        geoRequired: number;
+        geofenceLat: number;
+        geofenceLng: number;
+        geofenceRadiusMeters: number;
+        maxAccuracyMeters: number;
+        qrEnabled: number;
+        punchFallbackMode: string;
+        qrSecret: string;
+        kioskDeviceLabel: string;
+      }>;
 
-    if (settings) {
-      if (!settings.qrSecret || settings.qrSecret.trim() === "") {
-        return this.prisma.companySettings.update({
-          where: { companyId },
-          data: { qrSecret: this.generateQrSecret() },
-        });
+      if (result.length > 0) {
+        const settings = result[0];
+        const qrSecret = settings.qrSecret?.trim() || "";
+        
+        // Se não tem QR secret, gera e atualiza
+        if (!qrSecret) {
+          const newSecret = this.generateQrSecret();
+          await this.prisma.$executeRawUnsafe(
+            `UPDATE "CompanySettings" SET "qrSecret" = ? WHERE "companyId" = ?`,
+            newSecret,
+            companyId
+          );
+          
+          return {
+            geofenceEnabled: Boolean(settings.geofenceEnabled),
+            geoRequired: Boolean(settings.geoRequired),
+            geofenceLat: settings.geofenceLat,
+            geofenceLng: settings.geofenceLng,
+            geofenceRadiusMeters: settings.geofenceRadiusMeters,
+            maxAccuracyMeters: settings.maxAccuracyMeters,
+            qrEnabled: Boolean(settings.qrEnabled),
+            punchFallbackMode: settings.punchFallbackMode,
+            qrSecret: newSecret,
+          };
+        }
+        
+        return {
+          geofenceEnabled: Boolean(settings.geofenceEnabled),
+          geoRequired: Boolean(settings.geoRequired),
+          geofenceLat: settings.geofenceLat,
+          geofenceLng: settings.geofenceLng,
+          geofenceRadiusMeters: settings.geofenceRadiusMeters,
+          maxAccuracyMeters: settings.maxAccuracyMeters,
+          qrEnabled: Boolean(settings.qrEnabled),
+          punchFallbackMode: settings.punchFallbackMode,
+          qrSecret: qrSecret,
+        };
       }
-      return settings;
+    } catch (error: any) {
+      // Se falhar, tenta criar com campos básicos
+      console.error("Erro ao buscar settings:", error.message);
     }
 
-    return this.prisma.companySettings.create({
-      data: {
-        companyId,
-        geofenceEnabled: true,
-        geoRequired: true,
-        geofenceLat: 0,
-        geofenceLng: 0,
-        geofenceRadiusMeters: 200,
-        maxAccuracyMeters: 100,
-        qrEnabled: true,
-        punchFallbackMode: "GEO_OR_QR",
-        qrSecret: this.generateQrSecret(),
-        kioskDeviceLabel: "",
-      },
-    });
+    // Se não existe, cria com campos básicos usando raw SQL
+    const qrSecret = this.generateQrSecret();
+    await this.prisma.$executeRawUnsafe(
+      `INSERT INTO "CompanySettings" 
+       ("companyId", "geofenceEnabled", "geoRequired", "geofenceLat", "geofenceLng", 
+        "geofenceRadiusMeters", "maxAccuracyMeters", "qrEnabled", "punchFallbackMode", 
+        "qrSecret", "kioskDeviceLabel")
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      companyId,
+      true,  // geofenceEnabled
+      true,  // geoRequired
+      0,     // geofenceLat
+      0,     // geofenceLng
+      200,   // geofenceRadiusMeters
+      100,   // maxAccuracyMeters
+      true,  // qrEnabled
+      "GEO_OR_QR",  // punchFallbackMode
+      qrSecret,
+      ""     // kioskDeviceLabel
+    );
+
+    return {
+      geofenceEnabled: true,
+      geoRequired: true,
+      geofenceLat: 0,
+      geofenceLng: 0,
+      geofenceRadiusMeters: 200,
+      maxAccuracyMeters: 100,
+      qrEnabled: true,
+      punchFallbackMode: "GEO_OR_QR",
+      qrSecret: qrSecret,
+    };
   }
 
   private evaluateGeo(settings: CompanySettingsSnapshot, geo: GeoInput | null): GeoDecision {

@@ -13,11 +13,23 @@
         <div class="form-row">
           <label class="field">
             <span class="label">{{ t("admin.settings.latitude") }}</span>
-            <input v-model.number="form.geofenceLat" class="input" type="number" step="0.000001" />
+            <input 
+              v-model.number="form.geofenceLat" 
+              class="input" 
+              type="number" 
+              step="0.000001" 
+              placeholder="Ex: -23.5505199 ou -23.5505199"
+            />
           </label>
           <label class="field">
             <span class="label">{{ t("admin.settings.longitude") }}</span>
-            <input v-model.number="form.geofenceLng" class="input" type="number" step="0.000001" />
+            <input 
+              v-model.number="form.geofenceLng" 
+              class="input" 
+              type="number" 
+              step="0.000001" 
+              placeholder="Ex: -46.6333094 ou -46.6333094"
+            />
           </label>
         </div>
 
@@ -322,7 +334,8 @@ const handleSave = async () => {
       defaultToleranceMinutes: form.defaultToleranceMinutes,
       defaultTimezone: form.defaultTimezone,
     });
-    Object.assign(form, data);
+    // Não recarrega do servidor para evitar perder valores que não existem no banco
+    // Os valores já estão no form, então apenas confirma sucesso
     success.value = t("admin.settings.saved");
   } catch (err) {
     error.value = getErrorMessage(err);

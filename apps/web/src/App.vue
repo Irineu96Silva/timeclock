@@ -9,28 +9,39 @@
         {{ t("app.logout") }}
       </button>
     </header>
-    <main :class="['app-main', isKioskRoute ? 'app-main--kiosk' : '']">
-      <nav v-if="isSuperAdminRoute" class="admin-nav">
-        <router-link class="admin-nav__link" to="/super-admin/companies">
-          Empresas
-        </router-link>
-      </nav>
-      <nav v-else-if="isAdminRoute" class="admin-nav">
-        <router-link class="admin-nav__link" to="/admin/dashboard">
-          {{ t("admin.menu.dashboard") }}
-        </router-link>
-        <router-link class="admin-nav__link" to="/admin/employees">
-          {{ t("admin.menu.employees") }}
-        </router-link>
-        <router-link class="admin-nav__link" to="/admin/settings">
-          {{ t("admin.menu.settings") }}
-        </router-link>
-        <router-link class="admin-nav__link" to="/admin/exports">
-          {{ t("admin.menu.exports") }}
-        </router-link>
-      </nav>
-      <router-view />
-    </main>
+    <div class="app-layout">
+      <aside v-if="!isKioskRoute && (isSuperAdminRoute || isAdminRoute)" class="app-sidebar">
+        <nav class="sidebar-nav">
+          <template v-if="isSuperAdminRoute">
+            <router-link class="sidebar-nav__link" to="/super-admin/companies">
+              <span class="sidebar-nav__icon">🏢</span>
+              <span>Empresas</span>
+            </router-link>
+          </template>
+          <template v-else-if="isAdminRoute">
+            <router-link class="sidebar-nav__link" to="/admin/dashboard">
+              <span class="sidebar-nav__icon">📊</span>
+              <span>{{ t("admin.menu.dashboard") }}</span>
+            </router-link>
+            <router-link class="sidebar-nav__link" to="/admin/employees">
+              <span class="sidebar-nav__icon">👥</span>
+              <span>{{ t("admin.menu.employees") }}</span>
+            </router-link>
+            <router-link class="sidebar-nav__link" to="/admin/settings">
+              <span class="sidebar-nav__icon">⚙️</span>
+              <span>{{ t("admin.menu.settings") }}</span>
+            </router-link>
+            <router-link class="sidebar-nav__link" to="/admin/exports">
+              <span class="sidebar-nav__icon">📥</span>
+              <span>{{ t("admin.menu.exports") }}</span>
+            </router-link>
+          </template>
+        </nav>
+      </aside>
+      <main :class="['app-main', isKioskRoute ? 'app-main--kiosk' : '', (isSuperAdminRoute || isAdminRoute) ? 'app-main--with-sidebar' : '']">
+        <router-view />
+      </main>
+    </div>
   </div>
 </template>
 
