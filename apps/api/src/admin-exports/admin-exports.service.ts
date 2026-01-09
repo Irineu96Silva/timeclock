@@ -24,13 +24,21 @@ type ScheduleSnapshot = {
 export class AdminExportsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private ensureCompanyId(admin: AuthenticatedUser): string {
+    if (!admin.companyId) {
+      throw new BadRequestException("CompanyId é obrigatório para esta operação");
+    }
+    return admin.companyId;
+  }
+
   async buildEmployeeCsv(
     admin: AuthenticatedUser,
     employeeId: string,
     range: { from?: string; to?: string },
   ) {
+    const companyId = this.ensureCompanyId(admin);
     const employee = await this.prisma.employeeProfile.findFirst({
-      where: { id: employeeId, companyId: admin.companyId },
+      where: { id: employeeId, companyId },
       select: {
         id: true,
         fullName: true,
@@ -51,7 +59,7 @@ export class AdminExportsService {
 
     const events = await this.prisma.timeClockEvent.findMany({
       where: {
-        companyId: admin.companyId,
+        companyId,
         employeeId: employee.id,
         timestamp: {
           gte: start,
@@ -256,8 +264,9 @@ export class AdminExportsService {
     employeeId: string,
     range: { from?: string; to?: string },
   ) {
+    const companyId = this.ensureCompanyId(admin);
     const employee = await this.prisma.employeeProfile.findFirst({
-      where: { id: employeeId, companyId: admin.companyId },
+      where: { id: employeeId, companyId },
       select: {
         id: true,
         fullName: true,
@@ -278,7 +287,7 @@ export class AdminExportsService {
 
     const events = await this.prisma.timeClockEvent.findMany({
       where: {
-        companyId: admin.companyId,
+        companyId,
         employeeId: employee.id,
         timestamp: {
           gte: start,
@@ -429,12 +438,13 @@ export class AdminExportsService {
     employeeIds: string[],
     range: { from?: string; to?: string },
   ) {
+    const companyId = this.ensureCompanyId(admin);
     const { start, end, fromLabel, toLabel } = this.resolveDateRange(range.from, range.to);
 
     const employees = await this.prisma.employeeProfile.findMany({
       where: {
         id: { in: employeeIds },
-        companyId: admin.companyId,
+        companyId,
       },
       select: {
         id: true,
@@ -457,7 +467,7 @@ export class AdminExportsService {
     for (const employee of employees) {
       const events = await this.prisma.timeClockEvent.findMany({
         where: {
-          companyId: admin.companyId,
+          companyId,
           employeeId: employee.id,
           timestamp: {
             gte: start,
