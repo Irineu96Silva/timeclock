@@ -23,8 +23,11 @@ export class AdminSettingsController {
   }
 
   @Patch()
-  updateSettings(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateSettingsDto) {
-    return this.adminSettingsService.updateSettings(user.companyId!, dto);
+  async updateSettings(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateSettingsDto) {
+    if (!user.companyId) {
+      throw new BadRequestException("CompanyId é obrigatório");
+    }
+    return this.adminSettingsService.updateSettings(user.companyId, dto);
   }
 
   @Post("qr/regenerate-secret")
