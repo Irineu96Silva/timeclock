@@ -207,6 +207,7 @@ a {
 .app-main--with-sidebar {
   padding-left: var(--spacing-xl);
   padding-right: var(--spacing-xl);
+  max-width: calc(1440px - 280px);
 }
 
 .app-main--kiosk {
@@ -234,6 +235,13 @@ a {
   
   .app-main--with-sidebar {
     max-width: 100%;
+    padding-left: var(--spacing-lg);
+    padding-right: var(--spacing-lg);
+  }
+  
+  .list-item {
+    grid-template-columns: 1fr auto;
+    gap: var(--spacing-md);
   }
 }
 
@@ -246,12 +254,20 @@ a {
   
   .app-main--with-sidebar {
     max-width: calc(1440px - 280px);
+    padding-left: var(--spacing-xl);
+    padding-right: var(--spacing-xl);
+  }
+  
+  .list-item {
+    grid-template-columns: 1fr auto;
+    gap: var(--spacing-lg);
   }
 }
 
 .page-grid--single {
-  grid-template-columns: minmax(0, 500px);
+  grid-template-columns: minmax(0, 900px);
   justify-content: center;
+  max-width: 100%;
 }
 
 .card {
@@ -477,15 +493,16 @@ input[type="checkbox"] {
 .list-scroll {
   max-height: 60vh;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 0.4rem;
 }
 
 .list-item,
 .event-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--spacing-md);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--spacing-lg);
+  align-items: start;
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
@@ -499,9 +516,11 @@ input[type="checkbox"] {
   border-color: var(--color-primary-100);
 }
 
+/* Área de informações do colaborador - nunca será sobreposta */
 .list-item > div:first-child {
-  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  word-wrap: break-word;
 }
 
 .list-item > div:first-child strong {
@@ -510,25 +529,30 @@ input[type="checkbox"] {
   font-weight: 600;
   color: var(--color-text);
   margin-bottom: var(--spacing-xs);
+  word-break: break-word;
 }
 
 .list-item > div:first-child .muted {
   font-size: var(--font-size-sm);
+  word-break: break-word;
 }
 
+/* Área de ações - sempre à direita, sem sobrepor */
 .list-actions {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
   gap: var(--spacing-sm);
-  flex-wrap: wrap;
-  justify-content: flex-end;
   flex-shrink: 0;
+  min-width: fit-content;
 }
 
 .list-action-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-xs);
+  justify-content: flex-end;
+  max-width: 100%;
 }
 
 .dashboard-stack {
@@ -656,6 +680,7 @@ input[type="checkbox"] {
   display: flex;
   gap: var(--spacing-xs);
   flex-wrap: wrap;
+  margin-bottom: var(--spacing-xs);
 }
 
 .badge {
@@ -1023,8 +1048,11 @@ input[type="checkbox"] {
 
 .table-container {
   overflow-x: auto;
+  overflow-y: visible;
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
+  width: 100%;
+  max-width: 100%;
 }
 
 .table {
@@ -1147,8 +1175,22 @@ input[type="checkbox"] {
   .list-item,
   .event-row,
   .live-row {
-    flex-direction: column;
-    align-items: flex-start;
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+  
+  .list-item .list-actions {
+    align-items: stretch;
+    width: 100%;
+  }
+  
+  .list-item .list-action-buttons {
+    justify-content: stretch;
+  }
+  
+  .list-item .list-action-buttons .btn {
+    flex: 1;
+    min-width: 0;
   }
 
   .live-header {
