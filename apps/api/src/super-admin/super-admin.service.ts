@@ -495,7 +495,6 @@ export class SuperAdminService {
       select: {
         id: true,
         email: true,
-        username: true,
         role: true,
         isActive: true,
         createdAt: true,
@@ -536,6 +535,15 @@ export class SuperAdminService {
         passwordHash,
         role: "ADMIN",
         isActive: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true,
+        companyId: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 

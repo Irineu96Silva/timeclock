@@ -17,36 +17,98 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto): Promise<AuthTokens> {
+    let user: any = null;
+
     // Busca usuário por email ou username
-    const whereClause: any = {
-      isActive: true,
-    };
-
     if (dto.email) {
-      whereClause.email = dto.email.toLowerCase().trim();
-    } else if (dto.username) {
-      whereClause.username = dto.username.toLowerCase().trim();
-    } else {
-      throw new UnauthorizedException("Email ou username é obrigatório");
-    }
+      const whereClause: any = {
+        email: dto.email.toLowerCase().trim(),
+        isActive: true,
+      };
 
-    // Se companyId foi fornecido, adiciona ao where (multi-tenant)
-    if (dto.companyId) {
-      whereClause.companyId = dto.companyId;
-    }
+      // Se companyId foi fornecido, adiciona ao where (multi-tenant)
+      if (dto.companyId) {
+        whereClause.companyId = dto.companyId;
+      }
 
-    const user = await this.prisma.user.findFirst({
-      where: whereClause,
-      include: {
-        company: {
+      user = await this.prisma.user.findFirst({
+        where: whereClause,
+        select: {
+          id: true,
+          email: true,
+          passwordHash: true,
+          role: true,
+          isActive: true,
+          companyId: true,
+          refreshTokenHash: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      // Busca company separadamente se necessário
+      if (user && user.companyId) {
+        const company = await this.prisma.company.findUnique({
+          where: { id: user.companyId },
           select: {
             id: true,
             name: true,
             isActive: true,
           },
-        },
-      },
-    });
+        });
+        user.company = company;
+      } else {
+        user.company = null;
+      }
+    } else if (dto.username) {
+      // Busca por username usando raw SQL (coluna pode não existir ainda)
+      try {
+        const whereConditions: string[] = ['"isActive" = 1'];
+        const params: any[] = [];
+        
+        whereConditions.push('"username" = ?');
+        params.push(dto.username.toLowerCase().trim());
+
+        if (dto.companyId) {
+          whereConditions.push('"companyId" = ?');
+          params.push(dto.companyId);
+        }
+
+        const users = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT id, email, "passwordHash", role, "isActive", "companyId", "refreshTokenHash", "createdAt", "updatedAt" 
+           FROM "User" 
+           WHERE ${whereConditions.join(' AND ')} 
+           LIMIT 1`,
+          ...params
+        );
+
+        if (users && users.length > 0) {
+          user = users[0];
+          // Busca company separadamente
+          if (user.companyId) {
+            const company = await this.prisma.company.findUnique({
+              where: { id: user.companyId },
+              select: {
+                id: true,
+                name: true,
+                isActive: true,
+              },
+            });
+            user.company = company;
+          } else {
+            user.company = null;
+          }
+        }
+      } catch (error: any) {
+        // Se a coluna username não existir, retorna erro
+        if (error.message?.includes("no such column") || error.message?.includes("username")) {
+          throw new UnauthorizedException("Login por username ainda não está disponível");
+        }
+        throw error;
+      }
+    } else {
+      throw new UnauthorizedException("Email ou username é obrigatório");
+    }
 
     if (!user) {
       throw new UnauthorizedException("Usuário não encontrado");
@@ -87,6 +149,17 @@ export class AuthService {
     }
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        role: true,
+        isActive: true,
+        companyId: true,
+        refreshTokenHash: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     if (!user || !user.isActive || !user.refreshTokenHash) {
@@ -129,7 +202,15 @@ export class AuthService {
         email: email.toLowerCase().trim(),
         isActive: true,
       },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        role: true,
+        isActive: true,
+        companyId: true,
+        createdAt: true,
+        updatedAt: true,
         company: {
           select: {
             id: true,
@@ -144,6 +225,16 @@ export class AuthService {
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        role: true,
+        isActive: true,
+        companyId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     if (!user) {
