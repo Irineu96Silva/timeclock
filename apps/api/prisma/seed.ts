@@ -75,6 +75,16 @@ async function main() {
           email: superAdminEmail,
           role: "SUPER_ADMIN",
         },
+        select: {
+          id: true,
+          email: true,
+          passwordHash: true,
+          role: true,
+          isActive: true,
+          companyId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       });
     }, 5, 2000); // 5 tentativas, começando com 2 segundos
   } catch (error: any) {
@@ -96,9 +106,19 @@ async function main() {
         true,
         existingSuperAdmin.id
       );
-      superAdmin = await prisma.user.findUnique({
-        where: { id: existingSuperAdmin.id },
-      });
+          superAdmin = await prisma.user.findUnique({
+            where: { id: existingSuperAdmin.id },
+            select: {
+              id: true,
+              email: true,
+              passwordHash: true,
+              role: true,
+              isActive: true,
+              companyId: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
       if (!superAdmin) {
         throw new Error("Não foi possível atualizar o Super Admin");
       }
@@ -111,6 +131,16 @@ async function main() {
           passwordHash: superAdminPasswordHash,
           role: "SUPER_ADMIN",
           isActive: true,
+        },
+        select: {
+          id: true,
+          email: true,
+          passwordHash: true,
+          role: true,
+          isActive: true,
+          companyId: true,
+          createdAt: true,
+          updatedAt: true,
         },
       });
     }
@@ -134,6 +164,16 @@ async function main() {
       // Busca o registro criado
       superAdmin = await prisma.user.findUnique({
         where: { id: superAdminId },
+        select: {
+          id: true,
+          email: true,
+          passwordHash: true,
+          role: true,
+          isActive: true,
+          companyId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
       });
     } catch (sqlError: any) {
       // Se falhar por constraint NOT NULL, cria empresa SYSTEM e usa ela
@@ -177,6 +217,16 @@ async function main() {
           );
           superAdmin = await prisma.user.findUnique({
             where: { id: superAdminId },
+            select: {
+              id: true,
+              email: true,
+              passwordHash: true,
+              role: true,
+              isActive: true,
+              companyId: true,
+              createdAt: true,
+              updatedAt: true,
+            },
           });
         } catch (createError: any) {
           // Se ainda falhar, tenta buscar existente
@@ -185,6 +235,16 @@ async function main() {
             where: {
               email: superAdminEmail,
               role: "SUPER_ADMIN",
+            },
+            select: {
+              id: true,
+              email: true,
+              passwordHash: true,
+              role: true,
+              isActive: true,
+              companyId: true,
+              createdAt: true,
+              updatedAt: true,
             },
           });
           
@@ -201,6 +261,16 @@ async function main() {
               );
               superAdmin = await prisma.user.findUnique({
                 where: { id: retrySuperAdmin.id },
+                select: {
+                  id: true,
+                  email: true,
+                  passwordHash: true,
+                  role: true,
+                  isActive: true,
+                  companyId: true,
+                  createdAt: true,
+                  updatedAt: true,
+                },
               });
             } catch (updateError: any) {
               // Se falhar, tenta com Prisma
@@ -211,6 +281,16 @@ async function main() {
                   passwordHash: superAdminPasswordHash,
                   role: "SUPER_ADMIN",
                   isActive: true,
+                },
+                select: {
+                  id: true,
+                  email: true,
+                  passwordHash: true,
+                  role: true,
+                  isActive: true,
+                  companyId: true,
+                  createdAt: true,
+                  updatedAt: true,
                 },
               });
             }
@@ -225,6 +305,16 @@ async function main() {
           where: {
             email: superAdminEmail,
             role: "SUPER_ADMIN",
+          },
+          select: {
+            id: true,
+            email: true,
+            passwordHash: true,
+            role: true,
+            isActive: true,
+            companyId: true,
+            createdAt: true,
+            updatedAt: true,
           },
         });
         
@@ -241,6 +331,16 @@ async function main() {
             );
             superAdmin = await prisma.user.findUnique({
               where: { id: retrySuperAdmin.id },
+              select: {
+                id: true,
+                email: true,
+                passwordHash: true,
+                role: true,
+                isActive: true,
+                companyId: true,
+                createdAt: true,
+                updatedAt: true,
+              },
             });
           } catch (updateError: any) {
             // Se falhar, tenta com Prisma
@@ -251,6 +351,16 @@ async function main() {
                 passwordHash: superAdminPasswordHash,
                 role: "SUPER_ADMIN",
                 isActive: true,
+              },
+              select: {
+                id: true,
+                email: true,
+                passwordHash: true,
+                role: true,
+                isActive: true,
+                companyId: true,
+                createdAt: true,
+                updatedAt: true,
               },
             });
           }
@@ -309,6 +419,16 @@ async function main() {
         companyId: company.id,
         email: adminEmail,
       },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        role: true,
+        isActive: true,
+        companyId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   }, 5, 2000);
 
@@ -324,6 +444,16 @@ async function main() {
             role: "ADMIN",
             isActive: true,
           },
+          select: {
+            id: true,
+            email: true,
+            passwordHash: true,
+            role: true,
+            isActive: true,
+            companyId: true,
+            createdAt: true,
+            updatedAt: true,
+          },
         })
       : await prisma.user.create({
           data: {
@@ -332,6 +462,16 @@ async function main() {
             passwordHash,
             role: "ADMIN",
             isActive: true,
+          },
+          select: {
+            id: true,
+            email: true,
+            passwordHash: true,
+            role: true,
+            isActive: true,
+            companyId: true,
+            createdAt: true,
+            updatedAt: true,
           },
         });
   }, 5, 2000);
