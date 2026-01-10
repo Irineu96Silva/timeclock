@@ -163,6 +163,16 @@
                       : t("admin.employees.resetPassword")
                   }}
                 </button>
+                <button
+                  class="btn btn-ghost btn-sm"
+                  type="button"
+                  :disabled="deletingId === employee.id"
+                  @click="handleDelete(employee)"
+                >
+                  {{
+                    deletingId === employee.id ? "Excluindo..." : "Excluir"
+                  }}
+                </button>
               </div>
             </div>
           </div>
@@ -406,6 +416,7 @@ const employees = ref<EmployeeItem[]>([]);
 const loading = ref(true);
 const creating = ref(false);
 const resettingId = ref<string | null>(null);
+const deletingId = ref<string | null>(null);
 const error = ref("");
 const passwordModal = ref<{ email: string; password: string } | null>(null);
 const copied = ref(false);
@@ -512,6 +523,24 @@ const handleResetPassword = async (employee: EmployeeItem) => {
     error.value = getErrorMessage(err);
   } finally {
     resettingId.value = null;
+  }
+};
+
+const handleDelete = async (employee: EmployeeItem) => {
+  if (!confirm(`Tem certeza que deseja excluir o colaborador "${employee.fullName}"? Esta ação não pode ser desfeita.`)) {
+    return;
+  }
+
+  error.value = "";
+  deletingId.value = employee.id;
+
+  try {
+    await api.delete(`/employees/${employee.id}`);
+    await loadEmployees();
+  } catch (err) {
+    error.value = getErrorMessage(err);
+  } finally {
+    deletingId.value = null;
   }
 };
 

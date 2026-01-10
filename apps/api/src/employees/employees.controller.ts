@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -56,5 +56,10 @@ export class EmployeesController {
   @Post(":id/qr/regenerate")
   async regenerateEmployeeQr(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.employeesService.regenerateEmployeeQr(id, user);
+  }
+
+  @Delete(":id")
+  async delete(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.employeesService.delete(id, user);
   }
 }

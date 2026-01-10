@@ -522,11 +522,17 @@ export class SuperAdminService {
       throw new NotFoundException("Empresa não encontrada");
     }
 
-    // Verificar se email já existe
+    // Verificar se email já existe usando select explícito
     const existing = await this.prisma.user.findFirst({
       where: {
         companyId,
         email: email.toLowerCase().trim(),
+      },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        companyId: true,
       },
     });
 
@@ -536,14 +542,22 @@ export class SuperAdminService {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = await this.prisma.user.create({
-      data: {
-        companyId,
-        email: email.toLowerCase().trim(),
-        passwordHash,
-        role: "ADMIN",
-        isActive: true,
-      },
+    // Usa raw SQL para criar usuário sem tentar incluir username
+    const userId = `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    await this.prisma.$executeRawUnsafe(
+      `INSERT INTO "User" (id, "companyId", email, "passwordHash", role, "isActive", "createdAt", "updatedAt") 
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+      userId,
+      companyId,
+      email.toLowerCase().trim(),
+      passwordHash,
+      "ADMIN",
+      true
+    );
+
+    // Busca o usuário criado com select explícito
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -554,6 +568,10 @@ export class SuperAdminService {
         updatedAt: true,
       },
     });
+
+    if (!user) {
+      throw new Error("Falha ao criar usuário admin");
+    }
 
     return user;
   }

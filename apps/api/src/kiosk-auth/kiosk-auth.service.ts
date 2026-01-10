@@ -163,6 +163,7 @@ export class KioskAuthService {
       });
     }
 
+    // Busca employee com select explícito para user (sem username)
     const employee = await this.prisma.employeeProfile.findFirst({
       where: {
         id: parsed.employeeId,
@@ -170,7 +171,21 @@ export class KioskAuthService {
         isActive: true,
         user: { isActive: true },
       },
-      include: { user: true },
+      select: {
+        id: true,
+        userId: true,
+        fullName: true,
+        companyId: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            isActive: true,
+            companyId: true,
+          },
+        },
+      },
     });
 
     if (!employee) {
