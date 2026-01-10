@@ -528,21 +528,25 @@ input[type="checkbox"] {
 
 /* Área de informações do colaborador - nunca será sobreposta */
 .list-item > .list-item-info {
-  min-width: 0;
-  max-width: calc(100% - 200px);
+  min-width: 150px;
+  max-width: calc(100% - 250px);
   overflow: visible;
-  word-wrap: normal;
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
   white-space: normal;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
   text-align: left;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
 @media (max-width: 768px) {
   .list-item > .list-item-info {
     max-width: 100%;
+    min-width: 0;
   }
 }
 
@@ -551,24 +555,44 @@ input[type="checkbox"] {
   font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--color-text);
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.5;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  word-spacing: normal !important;
+  letter-spacing: normal !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  text-transform: none !important;
+  unicode-bidi: normal !important;
   margin: 0;
+  padding: 0;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
 }
 
 .list-item-email {
   display: block;
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.5;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  word-spacing: normal !important;
+  letter-spacing: normal !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  text-transform: none !important;
+  unicode-bidi: normal !important;
   margin: 0;
+  padding: 0;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 768px) {
@@ -576,7 +600,8 @@ input[type="checkbox"] {
   .list-item-email {
     white-space: normal;
     overflow: visible;
-    text-overflow: clip;
+    word-break: normal;
+    max-width: 100%;
   }
 }
 
