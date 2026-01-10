@@ -378,7 +378,7 @@ export class EmployeesService {
   }
 
   async delete(id: string, admin: AuthenticatedUser) {
-    // Busca employee com select explícito
+    // Busca employee com select explícito incluindo relações para verificar foreign keys
     const employee = await this.prisma.employeeProfile.findFirst({
       where: { id, companyId: admin.companyId! },
       select: {
@@ -394,12 +394,49 @@ export class EmployeesService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // Deleta o employee profile primeiro (cascade vai deletar relacionamentos)
-      await tx.employeeProfile.delete({
-        where: { id: employee.id },
-      });
+      // Ordem correta de deleção para respeitar foreign keys:
+      // 1. Deleta eventos de ponto (referencia employeeId)
+      try {
+        await tx.timeClockEvent.deleteMany({
+          where: { employeeId: employee.id },
+        });
+      } catch {
+        // Ignora se não houver eventos
+      }
 
-      // Deleta o usuário associado usando raw SQL para evitar erro de username
+      // 2. Deleta ajustes de ponto (referencia employeeId)
+      try {
+        await tx.timeAdjustmentRequest.deleteMany({
+          where: { employeeId: employee.id },
+        });
+      } catch {
+        // Ignora se não houver ajustes
+      }
+
+      // 3. Deleta registro Employee se existir (referencia employeeProfileId)
+      try {
+        await tx.employee.deleteMany({
+          where: { employeeProfileId: employee.id },
+        });
+      } catch {
+        // Ignora se não houver registro Employee
+      }
+
+      // 4. Deleta o employee profile (referencia userId do User)
+      try {
+        await tx.employeeProfile.delete({
+          where: { id: employee.id },
+        });
+      } catch (error: any) {
+        // Se falhar por foreign key, pode ser porque User ainda referencia
+        // Nesse caso, precisa deletar o User primeiro, mas isso não deveria acontecer
+        // porque EmployeeProfile referencia User, não o contrário
+        throw new BadRequestException(
+          `Não foi possível excluir colaborador: ${error.message || "Erro de integridade referencial"}`
+        );
+      }
+
+      // 5. Deleta o usuário associado usando raw SQL para evitar erro de username
       try {
         await tx.$executeRawUnsafe(
           `DELETE FROM "User" WHERE "id" = ?`,
@@ -411,26 +448,35 @@ export class EmployeesService {
           await tx.user.delete({
             where: { id: employee.userId },
           });
-        } catch {
-          // Ignora erro se ambos falharem (pode já ter sido deletado por cascade)
-          console.warn(`Erro ao deletar usuário ${employee.userId}, pode já ter sido deletado por cascade`);
+        } catch (deleteError: any) {
+          // Se ainda falhar, verifica se é porque já foi deletado
+          if (deleteError.code !== "P2025") { // P2025 = Record not found
+            throw new BadRequestException(
+              `Erro ao deletar usuário: ${deleteError.message || "Erro desconhecido"}`
+            );
+          }
         }
       }
 
-      // Cria log de auditoria
-      await tx.auditLog.create({
-        data: {
-          companyId: admin.companyId!,
-          userId: admin.id,
-          action: "EMPLOYEE_DELETED",
-          entity: "EmployeeProfile",
-          entityId: employee.id,
-          payloadJson: JSON.stringify({
-            fullName: employee.fullName,
-            userId: employee.userId,
-          }),
-        },
-      });
+      // 6. Cria log de auditoria
+      try {
+        await tx.auditLog.create({
+          data: {
+            companyId: admin.companyId!,
+            userId: admin.id,
+            action: "EMPLOYEE_DELETED",
+            entity: "EmployeeProfile",
+            entityId: employee.id,
+            payloadJson: JSON.stringify({
+              fullName: employee.fullName,
+              userId: employee.userId,
+            }),
+          },
+        });
+      } catch {
+        // Ignora erro de audit log, não é crítico
+        console.warn("Erro ao criar log de auditoria para exclusão de colaborador");
+      }
     });
 
     return { success: true, message: "Colaborador excluído com sucesso" };

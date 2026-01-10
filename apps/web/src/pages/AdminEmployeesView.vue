@@ -8,7 +8,7 @@
 
       <form class="form" @submit.prevent="handleCreate">
         <label class="field">
-          <span class="label">{{ t("admin.employees.nameLabel") }}</span>
+          <span class="label">{{ t("admin.employees.nameLabel") }} <span class="required-indicator">*</span></span>
           <input
             v-model="form.fullName"
             class="input"
@@ -19,7 +19,7 @@
         </label>
 
         <label class="field">
-          <span class="label">{{ t("admin.employees.emailLabel") }}</span>
+          <span class="label">{{ t("admin.employees.emailLabel") }} <span class="required-indicator">*</span></span>
           <input
             v-model="form.email"
             class="input"

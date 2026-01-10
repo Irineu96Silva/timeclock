@@ -97,22 +97,28 @@
           <button class="btn btn-ghost btn-sm" type="button" @click="closeModal">×</button>
         </div>
         <form class="form" @submit.prevent="handleSubmit">
+          <div v-if="modalError" class="alert alert-error" style="margin-bottom: 1rem">
+            {{ modalError }}
+            <div v-if="modalErrorDetails" style="margin-top: 0.5rem; font-size: 0.875rem; opacity: 0.8;">
+              {{ modalErrorDetails }}
+            </div>
+          </div>
           <label class="field">
-            <span class="label">Nome *</span>
+            <span class="label">Nome <span class="required-indicator">*</span></span>
             <input v-model="form.name" class="input" type="text" required />
           </label>
           <label class="field">
             <span class="label">CNPJ</span>
-            <input v-model="form.cnpj" class="input" type="text" />
+            <input v-model="form.cnpj" class="input" type="text" placeholder="00.000.000/0000-00" />
           </label>
           <div class="form-row">
             <label class="field">
               <span class="label">Email</span>
-              <input v-model="form.email" class="input" type="email" />
+              <input v-model="form.email" class="input" type="email" placeholder="empresa@exemplo.com" />
             </label>
             <label class="field">
               <span class="label">Telefone</span>
-              <input v-model="form.phone" class="input" type="text" />
+              <input v-model="form.phone" class="input" type="text" placeholder="(00) 0000-0000" />
             </label>
           </div>
           <label class="field">
@@ -126,11 +132,11 @@
             </label>
             <label class="field">
               <span class="label">Estado</span>
-              <input v-model="form.state" class="input" type="text" />
+              <input v-model="form.state" class="input" type="text" placeholder="UF" maxlength="2" />
             </label>
             <label class="field">
               <span class="label">CEP</span>
-              <input v-model="form.zipCode" class="input" type="text" />
+              <input v-model="form.zipCode" class="input" type="text" placeholder="00000-000" />
             </label>
           </div>
           <label class="field">
@@ -186,6 +192,8 @@ const errorDetails = ref("");
 const showCreateModal = ref(false);
 const editingCompany = ref<Company | null>(null);
 const submitting = ref(false);
+const modalError = ref("");
+const modalErrorDetails = ref("");
 
 const form = ref({
   name: "",
@@ -223,6 +231,8 @@ const loadCompanies = async () => {
 const closeModal = () => {
   showCreateModal.value = false;
   editingCompany.value = null;
+  modalError.value = "";
+  modalErrorDetails.value = "";
   form.value = {
     name: "",
     cnpj: "",
@@ -253,23 +263,58 @@ const editCompany = (company: Company) => {
 
 const handleSubmit = async () => {
   submitting.value = true;
-  error.value = "";
-  errorDetails.value = "";
+  modalError.value = "";
+  modalErrorDetails.value = "";
+  // Limpa campos vazios antes de enviar
+  const payload: any = {
+    name: form.value.name.trim(),
+    isActive: form.value.isActive,
+  };
+  
+  if (form.value.cnpj && form.value.cnpj.trim()) {
+    payload.cnpj = form.value.cnpj.trim();
+  }
+  if (form.value.phone && form.value.phone.trim()) {
+    payload.phone = form.value.phone.trim();
+  }
+  if (form.value.email && form.value.email.trim()) {
+    payload.email = form.value.email.trim();
+  } else {
+    // Se email estiver vazio, envia null ao invés de string vazia
+    payload.email = null;
+  }
+  if (form.value.address && form.value.address.trim()) {
+    payload.address = form.value.address.trim();
+  }
+  if (form.value.city && form.value.city.trim()) {
+    payload.city = form.value.city.trim();
+  }
+  if (form.value.state && form.value.state.trim()) {
+    payload.state = form.value.state.trim();
+  }
+  if (form.value.zipCode && form.value.zipCode.trim()) {
+    payload.zipCode = form.value.zipCode.trim();
+  }
+
   try {
     if (editingCompany.value) {
-      await api.patch(`/super-admin/companies/${editingCompany.value.id}`, form.value);
+      await api.patch(`/super-admin/companies/${editingCompany.value.id}`, payload);
     } else {
-      await api.post("/super-admin/companies", form.value);
+      await api.post("/super-admin/companies", payload);
     }
     await loadCompanies();
     closeModal();
-  } catch (err) {
-    error.value = getErrorMessage(err);
+  } catch (err: any) {
+    modalError.value = getErrorMessage(err);
     const details = getErrorDetails(err);
-    if (details.code || details.status) {
-      errorDetails.value = `Código: ${details.code || "N/A"} | Status: ${details.status || "N/A"}`;
+    if (details.code || details.status || details.details) {
+      modalErrorDetails.value = `Código: ${details.code || "N/A"} | Status: ${details.status || "N/A"}`;
       if (details.details) {
-        errorDetails.value += ` | Detalhes: ${JSON.stringify(details.details)}`;
+        if (typeof details.details === 'string') {
+          modalErrorDetails.value += ` | ${details.details}`;
+        } else {
+          modalErrorDetails.value += ` | ${JSON.stringify(details.details)}`;
+        }
       }
     }
     console.error("Erro ao salvar empresa:", err);

@@ -220,23 +220,31 @@ export class SuperAdminService {
       if (error instanceof NotFoundException) {
         throw error;
       }
-      // Se falhar por causa de campos que não existem, tenta buscar apenas básicos
+      // Se falhar por causa de campos que não existem, tenta buscar apenas básicos usando raw SQL
       if (error.message?.includes("no column") || error.message?.includes("no such column")) {
-        const company = await this.prisma.company.findUnique({
-          where: { id },
-          select: {
-            id: true,
-            name: true,
-            createdAt: true,
-          },
-        });
+        const companyResult = await this.prisma.$queryRawUnsafe<Array<{
+          id: string;
+          name: string;
+          createdAt: Date;
+        }>>(
+          `SELECT id, name, "createdAt" FROM "Company" WHERE id = ? LIMIT 1`,
+          id
+        );
 
-        if (!company) {
+        if (!companyResult || companyResult.length === 0) {
           throw new NotFoundException("Empresa não encontrada");
         }
 
+        const company = companyResult[0];
+        const [usersCount, employeesCount, eventsCount] = await Promise.all([
+          this.prisma.user.count({ where: { companyId: id } }).catch(() => 0),
+          this.prisma.employeeProfile.count({ where: { companyId: id } }).catch(() => 0),
+          this.prisma.timeClockEvent.count({ where: { companyId: id } }).catch(() => 0),
+        ]);
+
         return {
-          ...company,
+          id: company.id,
+          name: company.name,
           cnpj: null,
           phone: null,
           email: null,
@@ -245,11 +253,12 @@ export class SuperAdminService {
           state: null,
           zipCode: null,
           isActive: true,
+          createdAt: company.createdAt,
           updatedAt: null,
           _count: {
-            users: 0,
-            employees: 0,
-            events: 0,
+            users: usersCount,
+            employees: employeesCount,
+            events: eventsCount,
           },
           settings: null,
         };
@@ -600,32 +609,30 @@ export class SuperAdminService {
   }
 
   async deleteCompany(id: string) {
-    const company = await this.prisma.company.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-        _count: {
-          select: {
-            users: true,
-            employees: true,
-            events: true,
-          },
-        },
-      },
-    });
+    // Busca empresa usando raw SQL para evitar erro de cnpj
+    const companyResult = await this.prisma.$queryRawUnsafe<Array<{
+      id: string;
+      name: string;
+      createdAt: Date;
+    }>>(
+      `SELECT id, name, "createdAt" FROM "Company" WHERE id = ? LIMIT 1`,
+      id
+    );
 
-    if (!company) {
+    if (!companyResult || companyResult.length === 0) {
       throw new NotFoundException("Empresa não encontrada");
     }
 
+    const company = companyResult[0];
+
     // Verificar se há dados associados
-    if (
-      company._count.users > 0 ||
-      company._count.employees > 0 ||
-      company._count.events > 0
-    ) {
+    const [usersCount, employeesCount, eventsCount] = await Promise.all([
+      this.prisma.user.count({ where: { companyId: id } }),
+      this.prisma.employeeProfile.count({ where: { companyId: id } }),
+      this.prisma.timeClockEvent.count({ where: { companyId: id } }),
+    ]);
+
+    if (usersCount > 0 || employeesCount > 0 || eventsCount > 0) {
       throw new BadRequestException(
         "Não é possível excluir empresa com usuários, funcionários ou registros de ponto associados",
       );
@@ -645,11 +652,13 @@ export class SuperAdminService {
   }
 
   async getCompanyUsers(companyId: string) {
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
-    });
+    // Verifica se empresa existe usando raw SQL para evitar erro de cnpj
+    const companyResult = await this.prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      `SELECT id FROM "Company" WHERE id = ? LIMIT 1`,
+      companyId
+    );
 
-    if (!company) {
+    if (!companyResult || companyResult.length === 0) {
       throw new NotFoundException("Empresa não encontrada");
     }
 
@@ -669,16 +678,17 @@ export class SuperAdminService {
   }
 
   async createCompanyAdmin(companyId: string, email: string, password: string) {
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-      },
-    });
+    // Verifica se empresa existe usando raw SQL para evitar erro de cnpj
+    const companyResult = await this.prisma.$queryRawUnsafe<Array<{
+      id: string;
+      name: string;
+      createdAt: Date;
+    }>>(
+      `SELECT id, name, "createdAt" FROM "Company" WHERE id = ? LIMIT 1`,
+      companyId
+    );
 
-    if (!company) {
+    if (!companyResult || companyResult.length === 0) {
       throw new NotFoundException("Empresa não encontrada");
     }
 
@@ -737,18 +747,21 @@ export class SuperAdminService {
   }
 
   async getCompanyStats(companyId: string) {
-    const company = await this.prisma.company.findUnique({
-      where: { id: companyId },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-      },
-    });
+    // Busca empresa usando raw SQL para evitar erro de cnpj
+    const companyResult = await this.prisma.$queryRawUnsafe<Array<{
+      id: string;
+      name: string;
+      createdAt: Date;
+    }>>(
+      `SELECT id, name, "createdAt" FROM "Company" WHERE id = ? LIMIT 1`,
+      companyId
+    );
 
-    if (!company) {
+    if (!companyResult || companyResult.length === 0) {
       throw new NotFoundException("Empresa não encontrada");
     }
+
+    const company = companyResult[0];
 
     const [users, employees, events, recentEvents] = await Promise.all([
       this.prisma.user.count({

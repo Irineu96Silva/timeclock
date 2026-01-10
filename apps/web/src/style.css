@@ -337,6 +337,14 @@ a {
 .label {
   font-size: 0.85rem;
   color: var(--color-muted);
+  display: inline-block;
+  margin-bottom: 0.25rem;
+}
+
+.required-indicator {
+  color: var(--color-danger, #ef4444);
+  font-weight: 600;
+  margin-left: 2px;
 }
 
 .input {
@@ -521,12 +529,21 @@ input[type="checkbox"] {
 /* Área de informações do colaborador - nunca será sobreposta */
 .list-item > .list-item-info {
   min-width: 0;
+  max-width: calc(100% - 200px);
   overflow: visible;
-  word-wrap: break-word;
+  word-wrap: normal;
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+  white-space: normal;
+  text-align: left;
+}
+
+@media (max-width: 768px) {
+  .list-item > .list-item-info {
+    max-width: 100%;
+  }
 }
 
 .list-item-name {
@@ -535,9 +552,11 @@ input[type="checkbox"] {
   font-weight: 600;
   color: var(--color-text);
   line-height: 1.4;
-  word-break: break-word;
-  overflow-wrap: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin: 0;
+  max-width: 100%;
 }
 
 .list-item-email {
@@ -545,9 +564,20 @@ input[type="checkbox"] {
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
   line-height: 1.4;
-  word-break: break-word;
-  overflow-wrap: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .list-item-name,
+  .list-item-email {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 
 /* Fallback para estrutura antiga */
