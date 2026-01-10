@@ -113,9 +113,9 @@
         </div>
         <div v-else class="list">
           <div v-for="employee in employees" :key="employee.id" class="list-item">
-            <div>
-              <strong>{{ employee.fullName }}</strong>
-              <p class="muted">{{ employee.user.email }}</p>
+            <div class="list-item-info">
+              <strong class="list-item-name">{{ employee.fullName || 'Sem nome' }}</strong>
+              <p class="list-item-email muted">{{ employee.user?.email || 'Sem email' }}</p>
             </div>
             <div class="list-actions">
               <div class="badge-group">
